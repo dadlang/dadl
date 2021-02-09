@@ -1,0 +1,42 @@
+
+name Cart
+namespace cart
+
+[types]
+Item struct
+    productId ProductId
+    quantity Integer
+
+[entities]
+Cart
+    userId UserId
+    items Sequence<Item>
+    
+[interactors.AddItem]
+name Add Item
+type mutation
+input
+    userId UserId #Identifier of the user
+    item Item #Item to add
+
+[interactors.GetCart]
+name Add Item
+type query
+input
+    userId UserId #Identifier of the user
+output
+    cart Cart
+
+[interactors.EmptyCart]
+name Empty Cart
+type idempotent mutation
+input
+    userId UserId #Identifier of the user
+
+[transport.rest]
+/v1
+    /cart
+        GET GetCart
+        DELETE EmptyCart
+        /add
+            POST AddItem

@@ -1,0 +1,23 @@
+@schema ./project.dadl
+
+name Online Boutique
+codename boutique
+
+#[modules.cart << ./modules/cart.dad]
+
+[global.types]
+UserId String
+ProductId String
+
+global
+#    types
+#        SomeType String
+
+[contexts]
+user
+    userID? UserID #Identifier of the user
+user2
+    userID2_1 UserID #Identifier of the user
+    userID2_2? UserID #Identifier of the user
+user3
+    userID3_1? UserID #Identifier of the user

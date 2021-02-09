@@ -1,0 +1,63 @@
+@schema "./sample.dads"
+
+[types]
+VehicleId String
+
+[entities]  
+Order
+    customer<&Customer>[rc]
+    creationDate<Date>[r]
+
+Customer
+    id ID
+    name String
+
+[api.operations]      
+Order
+    @query(Order)
+    @new(NewOrder)
+    @update(Order)
+    @delete(Order)
+
+[api.operations.Order.new]
+mapping
+
+[@import('order/operations.)]
+
+[in.graphql]
+endpoint: {GET, POST} /graphql
+operations
+    createNewOrder: mutation<Order.New>
+
+[in.rest]
+content: json, protobuf, xml
+endpoints:
+    /order
+        GET /: Order.query
+        POST /: Order.new
+        GET /{id}: Order.query(ID: id)
+        UPDATE /{id}: 
+        DELETE /{id}
+    /customer
+        @REST_CRUD(Customer)
+        /{customerId}
+            /order
+                GET /{id}
+    
+
+[cfg.securty]
+authentication
+    jwt
+        keystore:
+
+[+in.rest.endpoints]
+/oauth
+    @OAUTH2(['client_credentials'])
+
+
+[cfg.lang.java]
+    names
+        mapping
+            new: create
+    generator
+        rest: spring-web
