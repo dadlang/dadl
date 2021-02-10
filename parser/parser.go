@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 	"unicode"
@@ -100,6 +101,7 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}) (parseCo
 			}
 		}
 		treePath := result["treePath"]
+		importPath := result["importPath"]
 		parts := strings.Split(treePath, ".")
 		node := tree
 		for _, part := range parts {
@@ -113,6 +115,23 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}) (parseCo
 		schemaNode, err := p.schema.getNode(treePath)
 		if err != nil {
 			return parseContext{}, err
+		}
+
+		if importPath != "" {
+			file, err := os.Open("./sample/" + importPath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer file.Close()
+
+			parser := NewParser(&dadlSchemaImpl{root: schemaNode})
+			value, err := parser.Parse(file)
+			if err != nil {
+				return parseContext{}, err
+			}
+			for k, v := range value {
+				node[k] = v
+			}
 		}
 
 		// childParser, err := schemaNode.childParser()

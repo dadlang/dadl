@@ -7,7 +7,7 @@ global
     types
         SomeType String
 
-[modules.cart << ./modules/cart.dad]
+[modules.cart << ./modules/sample.dad]
 
 [global.types]
 UserId String

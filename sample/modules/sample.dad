@@ -1,0 +1,6 @@
+
+name Sample
+namespace sample
+
+[types]
+Item struct

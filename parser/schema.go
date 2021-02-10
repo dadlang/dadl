@@ -281,7 +281,20 @@ func ParseSchema() (DadlSchema, error) {
 			},
 			"modules": &childListOnlyNode{
 				childType: &genericSchemaNode{
-					children: map[string]SchemaNode{},
+					children: map[string]SchemaNode{
+						"name":      &stringValueNode{name: "name"},
+						"namespace": &stringValueNode{name: "namespace"},
+						"types": &childListOnlyNode{
+							childType: &customTokensNode{
+								keyTokenName: "name",
+								tokens: []TokenSpec{
+									regexToken{name: "name", regex: "[a-zA-Z0-9-_]+"},
+									regexToken{regex: "\\s+", optional: false},
+									regexToken{name: "baseType", regex: "[a-zA-Z0-9-_]+"},
+								},
+							},
+						},
+					},
 				},
 			},
 			"contexts": &identifierListNode{
