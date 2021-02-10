@@ -1,0 +1,20 @@
+@schema dads 0.1
+
+[tokens]
+ws \s+
+identifier [a-zA-Z0-9-_]+
+any .*
+
+[types]
+typeDef sequence <name:identifier> <:ws> <type:identifier> (<:ws> '#' <desc:any>)?
+typeDefs list[typeDef]
+
+[structure]
+name string
+codename string
+global
+    types typeDefs
+        SomeType String
+modules map[string]
+    types map[string]string
+contexts list[typeDef] as map[type]

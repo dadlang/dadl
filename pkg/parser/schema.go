@@ -2,7 +2,6 @@ package parser
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 )
@@ -90,7 +89,7 @@ func (n *stringValueNode) childParser() (NodeParser, error) {
 type keyWithDelegatedValueParser struct{}
 
 func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) error {
-	println("[keyWithDelegatedValueParser.parse]", value)
+	//println("[keyWithDelegatedValueParser.parse]", value)
 	value = strings.TrimSpace(value)
 	vals := strings.SplitN(value, " ", 2)
 
@@ -107,8 +106,8 @@ func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) err
 		}
 		childParser.parse(ctx, vals[1])
 	} else {
-		fmt.Printf("   - parent: %x\n", ctx.parent)
-		println("OK")
+		//fmt.Printf("   - parent: %x\n", ctx.parent)
+		//	println("OK")
 		ctx.parent[key] = Node{}
 		ctx.last = ctx.parent[key].(Node)
 	}
@@ -124,7 +123,7 @@ type stringValueParser struct {
 }
 
 func (p *stringValueParser) parse(ctx *parseContext, value string) error {
-	println("[stringValueParser.parse]", value)
+	//println("[stringValueParser.parse]", value)
 	ctx.parent[p.name] = value
 	return nil
 }
@@ -138,7 +137,7 @@ type keyValueListNode struct {
 }
 
 func (n *keyValueListNode) childNode(name string) (SchemaNode, error) {
-	println("ERRR:", name)
+	//println("ERRR:", name)
 	return &keyValueListNode{name: name}, nil
 }
 
@@ -151,13 +150,13 @@ type genericKeyValueParser struct {
 }
 
 func (p *genericKeyValueParser) parse(ctx *parseContext, value string) error {
-	println("[genericKeyValueParser.parse]", value)
+	//	println("[genericKeyValueParser.parse]", value)
 	value = strings.TrimSpace(value)
 	vals := strings.SplitN(value, " ", 2)
 	if len(vals) > 1 {
 		ctx.parent[vals[0]] = vals[1]
 	} else {
-		println("ERRRRRRRRRRRRR")
+		//	println("ERRRRRRRRRRRRR")
 	}
 	return nil
 }
@@ -246,7 +245,7 @@ type genericKeyParser struct {
 }
 
 func (p *genericKeyParser) parse(ctx *parseContext, value string) error {
-	println("[genericKeyParser.parse]", value)
+	//	println("[genericKeyParser.parse]", value)
 	key := strings.TrimSpace(value)
 	v := Node{}
 	ctx.parent[key] = v
@@ -407,7 +406,7 @@ type customTokensNodeParser struct {
 }
 
 func (p *customTokensNodeParser) parse(ctx *parseContext, value string) error {
-	println("[customTokensNodeParser.parse]", value)
+	//println("[customTokensNodeParser.parse]", value)
 
 	res := Node{}
 	match := p.re.FindStringSubmatch(strings.TrimSpace(value))

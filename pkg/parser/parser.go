@@ -2,10 +2,8 @@ package parser
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
-	"os"
 	"regexp"
 	"strings"
 	"unicode"
@@ -19,12 +17,12 @@ func NewParser(schema DadlSchema) Parser {
 var groupRe = regexp.MustCompile("^\\[(?P<treePath>[a-zA-Z0-9-_.]*)\\s*(?:<<\\s*(?P<importPath>.+))?\\]$")
 
 //Parse - scans given stream
-func (p *Parser) Parse(reader io.Reader) (Node, error) {
+func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, error) {
 	tree := Node{}
 	ctxByIndent := make([]parseContext, 100)
 	root := p.schema.getRoot()
 	ctx := parseContext{parent: tree, parentSchema: root}
-	fmt.Printf("CTX -> %x\n", ctx)
+	//fmt.Printf("CTX -> %x\n", ctx)
 	var err error
 
 	ctxByIndent = make([]parseContext, 100)
@@ -42,8 +40,8 @@ func (p *Parser) Parse(reader io.Reader) (Node, error) {
 		indentWeight := calcIndentWeight(line)
 
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-			println("Process group:", line)
-			ctx, err = p.processGroup(line, tree)
+			//	println("Process group:", line)
+			ctx, err = p.processGroup(line, tree, resources)
 			if err != nil {
 				return nil, err
 			}
@@ -53,20 +51,20 @@ func (p *Parser) Parse(reader io.Reader) (Node, error) {
 			if strings.HasPrefix(line, "#") {
 				//	fmt.Println("skip comment:", line)
 			} else if strings.HasPrefix(line, "@") {
-				fmt.Println("magic ->", line)
+				//		fmt.Println("magic ->", line)
 			} else {
 				if indentWeight > ctx.indentWeight {
-					println("Indent found: " + line)
+					//			println("Indent found: " + line)
 					ctx = parseContext{parent: ctx.last, parentSchema: ctx.lastSchema, indentWeight: indentWeight}
-					fmt.Printf("CTX -> %x\n", ctx)
+					//			fmt.Printf("CTX -> %x\n", ctx)
 					ctxByIndent[indentWeight] = ctx
 				} else if indentWeight < ctx.indentWeight {
-					println("Find by indent: ", indentWeight)
+					//			println("Find by indent: ", indentWeight)
 					ctx = ctxByIndent[indentWeight]
-					fmt.Printf("CTX -> %x\n", ctx)
+					//		fmt.Printf("CTX -> %x\n", ctx)
 				}
 
-				println("Parse line:", line)
+				//		println("Parse line:", line)
 				parser, err := ctx.parentSchema.childParser()
 				if err != nil {
 					return nil, err
@@ -90,8 +88,8 @@ type parseContext struct {
 	indentWeight int
 }
 
-func (p *Parser) processGroup(line string, tree map[string]interface{}) (parseContext, error) {
-	fmt.Println(line)
+func (p *Parser) processGroup(line string, tree map[string]interface{}, resources ResourceProvider) (parseContext, error) {
+	//fmt.Println(line)
 	match := groupRe.FindStringSubmatch(line)
 	if match != nil {
 		result := make(map[string]string)
@@ -118,14 +116,14 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}) (parseCo
 		}
 
 		if importPath != "" {
-			file, err := os.Open("./sample/" + importPath)
+			file, err := resources.GetResource(importPath)
 			if err != nil {
 				log.Fatal(err)
 			}
 			defer file.Close()
 
 			parser := NewParser(&dadlSchemaImpl{root: schemaNode})
-			value, err := parser.Parse(file)
+			value, err := parser.Parse(file, resources)
 			if err != nil {
 				return parseContext{}, err
 			}
