@@ -21,8 +21,13 @@ var groupRe = regexp.MustCompile("^\\[(?P<treePath>[a-zA-Z0-9-_.]*)\\s*(?:<<\\s*
 func (p *Parser) Parse(reader io.Reader) (Node, error) {
 	tree := Node{}
 	ctxByIndent := make([]parseContext, 100)
-	ctx := parseContext{parent: tree, parser: p.schema.rootParser()}
+	root := p.schema.getRoot()
+	ctx := parseContext{parent: tree, parentSchema: root}
+	fmt.Printf("CTX -> %x\n", ctx)
 	var err error
+
+	ctxByIndent = make([]parseContext, 100)
+	ctxByIndent[0] = ctx
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -32,11 +37,11 @@ func (p *Parser) Parse(reader io.Reader) (Node, error) {
 		}
 
 		line := strings.TrimRight(scanner.Text(), "\t \n")
-		println("Process line:", line)
 
 		indentWeight := calcIndentWeight(line)
 
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			println("Process group:", line)
 			ctx, err = p.processGroup(line, tree)
 			if err != nil {
 				return nil, err
@@ -45,24 +50,27 @@ func (p *Parser) Parse(reader io.Reader) (Node, error) {
 			ctxByIndent[0] = ctx
 		} else if strings.TrimSpace(line) != "" {
 			if strings.HasPrefix(line, "#") {
-				fmt.Println("skip comment:", line)
+				//	fmt.Println("skip comment:", line)
 			} else if strings.HasPrefix(line, "@") {
 				fmt.Println("magic ->", line)
 			} else {
 				if indentWeight > ctx.indentWeight {
 					println("Indent found: " + line)
-					next, err := ctx.parser.childParser()
-					if err != nil {
-						return nil, err
-					}
-					ctx = parseContext{parser: next, parent: ctx.current, indentWeight: indentWeight}
+					ctx = parseContext{parent: ctx.last, parentSchema: ctx.lastSchema, indentWeight: indentWeight}
+					fmt.Printf("CTX -> %x\n", ctx)
 					ctxByIndent[indentWeight] = ctx
 				} else if indentWeight < ctx.indentWeight {
 					println("Find by indent: ", indentWeight)
 					ctx = ctxByIndent[indentWeight]
+					fmt.Printf("CTX -> %x\n", ctx)
 				}
 
-				if err := ctx.parser.parse(&ctx, line); err != nil {
+				println("Parse line:", line)
+				parser, err := ctx.parentSchema.childParser()
+				if err != nil {
+					return nil, err
+				}
+				if err := parser.parse(&ctx, line); err != nil {
 					return nil, err
 				}
 
@@ -73,9 +81,11 @@ func (p *Parser) Parse(reader io.Reader) (Node, error) {
 }
 
 type parseContext struct {
-	parser       NodeParser
+	// parser       NodeParser
+	parentSchema SchemaNode
+	lastSchema   SchemaNode
 	parent       Node
-	current      Node
+	last         Node
 	indentWeight int
 }
 
@@ -100,12 +110,17 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}) (parseCo
 			}
 			node = next.(map[string]interface{})
 		}
-		groupParser, err := p.schema.parser(treePath)
+		schemaNode, err := p.schema.getNode(treePath)
 		if err != nil {
 			return parseContext{}, err
 		}
 
-		return parseContext{parent: node, parser: groupParser, indentWeight: 0}, nil
+		// childParser, err := schemaNode.childParser()
+		// if err != nil {
+		// 	return parseContext{}, err
+		// }
+
+		return parseContext{parent: node, parentSchema: schemaNode, indentWeight: 0}, nil
 	}
 	return parseContext{}, nil
 }
@@ -130,24 +145,8 @@ type Node = map[string]interface{}
 //NodeParser parses node.
 type NodeParser interface {
 	parse(ctx *parseContext, line string) error
-	childParser() (NodeParser, error)
+	// childParser() (NodeParser, error)
 }
-
-// type genericKeyValueParser struct{}
-
-// func (p *genericKeyValueParser) parse(ctx *parseContext, value string) error {
-// 	println("KV: ", value)
-// 	value = strings.TrimSpace(value)
-// 	vals := strings.SplitN(value, " ", 2)
-// 	if len(vals) > 1 {
-// 		ctx.parent[vals[0]] = vals[1]
-// 	}
-// 	return nil
-// }
-
-// func (p *genericKeyValueParser) childParser() (NodeParser, error) {
-// 	return nil, nil
-// }
 
 // type tokenSequenceParser struct{}
 
