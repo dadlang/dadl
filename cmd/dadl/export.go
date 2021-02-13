@@ -1,22 +1,21 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/dadlang/dadl/pkg/export"
 	"github.com/dadlang/dadl/pkg/parser"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 )
 
 var (
 	format string
 
-	formatChoices = map[string]func(map[string]interface{}) string{"json": toJSON, "yaml": toYAML}
+	formatChoices = map[string]func(map[string]interface{}) string{"json": export.ToJSON, "yaml": export.ToYAML}
 )
 
 func init() {
@@ -62,20 +61,4 @@ func exportHandler(filePath string) {
 	}
 
 	fmt.Print(exporter(tree))
-}
-
-func toJSON(tree map[string]interface{}) string {
-	result, err := json.MarshalIndent(tree, "", "  ")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return string(result)
-}
-
-func toYAML(tree map[string]interface{}) string {
-	result, err := yaml.Marshal(tree)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return string(result)
 }

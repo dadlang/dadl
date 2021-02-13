@@ -2,8 +2,10 @@ package parser
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 	"unicode"
@@ -52,6 +54,7 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 				//	fmt.Println("skip comment:", line)
 			} else if strings.HasPrefix(line, "@") {
 				//		fmt.Println("magic ->", line)
+				parseMagic(line, resources)
 			} else {
 				if indentWeight > ctx.indentWeight {
 					//			println("Indent found: " + line)
@@ -149,6 +152,41 @@ func calcIndentWeight(line string) int {
 		}
 	}
 	return len(line)
+}
+
+func parseMagic(line string, resources ResourceProvider) {
+	if strings.HasPrefix(line, "@schema ") {
+		parseSchema(line[8:], resources)
+	} else {
+		println("UNKNOW MAGIC")
+	}
+}
+
+func parseSchema(schemaName string, resources ResourceProvider) error {
+
+	p := NewParser(GetDadlSchema())
+	file, err := resources.GetResource(schemaName)
+	if err != nil {
+		panic(err)
+		//return err
+	}
+	tree, err := p.Parse(file, resources)
+	if err != nil {
+		panic(err)
+		//return err
+	}
+	println("SCHEMA:")
+	println(toJSON(tree))
+	os.Exit(1)
+	return nil
+}
+
+func toJSON(tree map[string]interface{}) string {
+	result, err := json.MarshalIndent(tree, "", "  ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(result)
 }
 
 //Parser - parses DADL files

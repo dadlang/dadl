@@ -2,6 +2,7 @@ package parser
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -9,6 +10,13 @@ import (
 //Errors
 var (
 	ErrUnexpectedNode = errors.New("Node is not defined in schema")
+)
+
+var (
+	regexIdentifierOrQuoted = "(?:[a-zA-Z0-9-_]+)|(['].*['])"
+	regexIdentifier         = "[a-zA-Z0-9-_]+"
+
+	keyWithDelegatedValueRe = regexp.MustCompile("(?P<key>" + regexIdentifierOrQuoted + ")(\\s+(?P<rest>.*))?")
 )
 
 //DadlSchema defines dad file schema.
@@ -90,21 +98,33 @@ type keyWithDelegatedValueParser struct{}
 
 func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) error {
 	//println("[keyWithDelegatedValueParser.parse]", value)
-	value = strings.TrimSpace(value)
-	vals := strings.SplitN(value, " ", 2)
 
-	key := vals[0]
+	res := map[string]string{}
+	match := keyWithDelegatedValueRe.FindStringSubmatch(strings.TrimSpace(value))
+	if match == nil {
+		return errors.New("invalid format")
+	}
+	if match != nil {
+		for i, name := range keyWithDelegatedValueRe.SubexpNames() {
+			if i != 0 && name != "" {
+				res[name] = match[i]
+			}
+		}
+	}
+
+	fmt.Printf("MATCH %v\n", res)
+	key := removeQuotes(res["key"])
 	child, err := ctx.parentSchema.childNode(key)
 	if err != nil {
 		return err
 	}
 	ctx.lastSchema = child
-	if len(vals) > 1 {
+	if res["rest"] != "" {
 		childParser, err := child.childParser()
 		if err != nil {
 			return nil
 		}
-		childParser.parse(ctx, vals[1])
+		childParser.parse(ctx, res["rest"])
 	} else {
 		//fmt.Printf("   - parent: %x\n", ctx.parent)
 		//	println("OK")
@@ -429,4 +449,120 @@ func (p *customTokensNodeParser) parse(ctx *parseContext, value string) error {
 
 func (p *customTokensNodeParser) childParser() (NodeParser, error) {
 	return nil, nil
+}
+
+//GetDadlSchema returns dadl schema
+func GetDadlSchema() DadlSchema {
+	return &dadlSchemaImpl{root: &genericSchemaNode{
+		children: map[string]SchemaNode{
+			"types": &dadlSchemaTypeNode{},
+			"structure": &genericSchemaNode{
+				children: map[string]SchemaNode{
+					"long name": &stringValueNode{"long name"},
+				},
+			},
+		},
+	}}
+}
+
+/////////////
+
+type dadlSchemaTypeNode struct {
+}
+
+func (n *dadlSchemaTypeNode) childNode(name string) (SchemaNode, error) {
+	panic("NOT IMPLEMENTED")
+}
+
+func (n *dadlSchemaTypeNode) childParser() (NodeParser, error) {
+	return &dadlSchemaTypeParser{}, nil
+}
+
+var typeBaseRe = regexp.MustCompile("(?P<name>" + regexIdentifier + ")\\s+(?P<baseType>" + regexIdentifier + ")(?P<extra>.*)")
+var listTypeArgsRe = regexp.MustCompile("(?P<itemType>[a-zA-Z0-9-_]+)(\\s+as\\s+(?P<mappedType>[a-zA-Z0-9-_]+)(\\[(?P<mappedTypeArg1>[a-zA-Z0-9-_]+)\\](?P<mappedTypeArg2>[a-zA-Z0-9-_]+)?)?)?")
+
+// typeDefs list typeDef as map[name]type
+
+type dadlSchemaTypeParser struct {
+}
+
+func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
+	println("[dadlSchemaTypeParser.parse]", value)
+
+	res := map[string]string{}
+	match := typeBaseRe.FindStringSubmatch(strings.TrimSpace(value))
+	// var keyValue string
+	if match != nil {
+		for i, name := range typeBaseRe.SubexpNames() {
+			if i != 0 && name != "" {
+				res[name] = match[i]
+			}
+		}
+	}
+	baseType := res["baseType"]
+	extra := res["extra"]
+	result := Node{
+		"baseType": baseType,
+	}
+	ctx.parent[res["name"]] = result
+
+	if baseType == "enum" {
+		parseEnumArgs(&parseContext{
+			parentSchema: ctx.parentSchema,
+			lastSchema:   ctx.lastSchema,
+			parent:       result,
+			last:         result,
+		}, strings.TrimSpace(extra), "values")
+	} else if baseType == "list" {
+		parseListTypeArgs(&parseContext{
+			parentSchema: ctx.parentSchema,
+			lastSchema:   ctx.lastSchema,
+			parent:       result,
+			last:         result,
+		}, strings.TrimSpace(extra), "values")
+	}
+
+	return nil
+}
+
+func (p *dadlSchemaTypeParser) childParser() (NodeParser, error) {
+	panic("NOT IMPLEMENTED")
+}
+
+func parseEnumArgs(ctx *parseContext, value string, key string) error {
+	ctx.parent[key] = strings.Split(value, " ")
+	return nil
+}
+
+func parseListTypeArgs(ctx *parseContext, value string, key string) error {
+	match := listTypeArgsRe.FindStringSubmatch(strings.TrimSpace(value))
+	// var keyValue string
+	res := map[string]string{}
+	if match != nil {
+		for i, name := range listTypeArgsRe.SubexpNames() {
+			if i != 0 && name != "" {
+				res[name] = match[i]
+			}
+		}
+	}
+	ctx.parent["itemType"] = res["itemType"]
+	if res["mappedType"] != "" {
+		mapped := map[string]string{}
+		mapped["mappedType"] = res["mappedType"]
+		mapped["mappedTypeArg1"] = res["mappedTypeArg1"]
+		mapped["mappedTypeArg2"] = res["mappedTypeArg2"]
+		ctx.parent["mapped"] = mapped
+	}
+	return nil
+}
+
+// [types]
+// operation enum GET POST PUT PATCH DELETE
+// typeDef sequence <name identifier> <SPACE> <type identifier> (<SPACE> '#' <desc string>)?
+
+func removeQuotes(val string) string {
+	if strings.HasPrefix(val, "'") && strings.HasSuffix(val, "'") {
+		return val[1 : len(val)-1]
+	}
+	return val
 }
