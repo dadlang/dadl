@@ -1,0 +1,6 @@
+@schema ./simple.dads
+
+someRoot
+    firstChild some long string value with spaces
+    secondChild
+        nestedChild 7  

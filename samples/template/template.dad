@@ -1,0 +1,10 @@
+@schema template 0.1
+
+[files]
+'./generate/{someParam}.txt'
+    Goland template goes here
+
+[logic]
+
+
+[templates]

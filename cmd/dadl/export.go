@@ -51,8 +51,7 @@ func exportHandler(filePath string) {
 	}
 	defer file.Close()
 
-	schema, _ := parser.ParseSchema()
-	p := parser.NewParser(schema)
+	p := parser.NewParser()
 	tree, err := p.Parse(file, parser.NewFSResourceProvider(filepath.Dir(filePath)))
 
 	if err != nil {

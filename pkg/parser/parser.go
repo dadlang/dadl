@@ -2,17 +2,19 @@ package parser
 
 import (
 	"bufio"
-	"encoding/json"
 	"io"
 	"log"
-	"os"
 	"regexp"
 	"strings"
 	"unicode"
 )
 
 //NewParser - creates new Parser instance
-func NewParser(schema DadlSchema) Parser {
+func NewParser() Parser {
+	return Parser{}
+}
+
+func newParserWithSchema(schema DadlSchema) Parser {
 	return Parser{schema: schema}
 }
 
@@ -22,8 +24,7 @@ var groupRe = regexp.MustCompile("^\\[(?P<treePath>[a-zA-Z0-9-_.]*)\\s*(?:<<\\s*
 func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, error) {
 	tree := Node{}
 	ctxByIndent := make([]parseContext, 100)
-	root := p.schema.getRoot()
-	ctx := parseContext{parent: tree, parentSchema: root}
+	ctx := parseContext{parent: tree, parentSchema: nil}
 	//fmt.Printf("CTX -> %x\n", ctx)
 	var err error
 
@@ -54,7 +55,10 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 				//	fmt.Println("skip comment:", line)
 			} else if strings.HasPrefix(line, "@") {
 				//		fmt.Println("magic ->", line)
-				parseMagic(line, resources)
+				err := p.parseMagic(&ctx, line, resources)
+				if err != nil {
+					return nil, err
+				}
 			} else {
 				if indentWeight > ctx.indentWeight {
 					//			println("Indent found: " + line)
@@ -67,7 +71,6 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 					//		fmt.Printf("CTX -> %x\n", ctx)
 				}
 
-				//		println("Parse line:", line)
 				parser, err := ctx.parentSchema.childParser()
 				if err != nil {
 					return nil, err
@@ -125,7 +128,7 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 			}
 			defer file.Close()
 
-			parser := NewParser(&dadlSchemaImpl{root: schemaNode})
+			parser := newParserWithSchema(&dadlSchemaImpl{root: schemaNode})
 			value, err := parser.Parse(file, resources)
 			if err != nil {
 				return parseContext{}, err
@@ -154,39 +157,18 @@ func calcIndentWeight(line string) int {
 	return len(line)
 }
 
-func parseMagic(line string, resources ResourceProvider) {
+func (p *Parser) parseMagic(ctx *parseContext, line string, resources ResourceProvider) error {
 	if strings.HasPrefix(line, "@schema ") {
-		parseSchema(line[8:], resources)
+		var err error
+		p.schema, err = parseSchema(line[8:], resources)
+		ctx.parentSchema = p.schema.getRoot()
+		if err != nil {
+			return err
+		}
 	} else {
 		println("UNKNOW MAGIC")
 	}
-}
-
-func parseSchema(schemaName string, resources ResourceProvider) error {
-
-	p := NewParser(GetDadlSchema())
-	file, err := resources.GetResource(schemaName)
-	if err != nil {
-		panic(err)
-		//return err
-	}
-	tree, err := p.Parse(file, resources)
-	if err != nil {
-		panic(err)
-		//return err
-	}
-	println("SCHEMA:")
-	println(toJSON(tree))
-	os.Exit(1)
 	return nil
-}
-
-func toJSON(tree map[string]interface{}) string {
-	result, err := json.MarshalIndent(tree, "", "  ")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return string(result)
 }
 
 //Parser - parses DADL files
@@ -200,23 +182,4 @@ type Node = map[string]interface{}
 //NodeParser parses node.
 type NodeParser interface {
 	parse(ctx *parseContext, line string) error
-	// childParser() (NodeParser, error)
 }
-
-// type tokenSequenceParser struct{}
-
-// func (p *tokenSequenceParser) parse(ctx *parseContext, value string) error {
-// 	value = strings.TrimSpace(value)
-// 	vals := strings.SplitN(value, " ", 3)
-// 	if len(vals) > 2 {
-// 		ctx.parent[vals[0]] = Node{
-// 			"type": vals[1],
-// 			"desc": vals[2][1:],
-// 		}
-// 	}
-// 	return nil
-// }
-
-// func (p *tokenSequenceParser) childParser() (NodeParser, error) {
-// 	return nil, nil
-// }

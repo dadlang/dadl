@@ -2,8 +2,8 @@ package parser
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -23,7 +23,6 @@ var (
 type DadlSchema interface {
 	getRoot() SchemaNode
 	getNode(path string) (SchemaNode, error)
-	//parser(nodePath string) (NodeParser, error)
 }
 
 //SchemaNode defines schema node
@@ -73,6 +72,7 @@ type genericSchemaNode struct {
 func (n *genericSchemaNode) childNode(name string) (SchemaNode, error) {
 	val, ok := n.children[name]
 	if !ok {
+		println("Not found node: ", name)
 		return nil, ErrUnexpectedNode
 	}
 	return val, nil
@@ -94,6 +94,18 @@ func (n *stringValueNode) childParser() (NodeParser, error) {
 	return &stringValueParser{name: n.name}, nil
 }
 
+type intValueNode struct {
+	name string
+}
+
+func (n *intValueNode) childNode(name string) (SchemaNode, error) {
+	return nil, nil
+}
+
+func (n *intValueNode) childParser() (NodeParser, error) {
+	return &intValueParser{name: n.name}, nil
+}
+
 type keyWithDelegatedValueParser struct{}
 
 func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) error {
@@ -112,7 +124,6 @@ func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) err
 		}
 	}
 
-	fmt.Printf("MATCH %v\n", res)
 	key := removeQuotes(res["key"])
 	child, err := ctx.parentSchema.childNode(key)
 	if err != nil {
@@ -152,12 +163,29 @@ func (p *stringValueParser) childParser() (NodeParser, error) {
 	return nil, nil
 }
 
+type intValueParser struct {
+	name string
+}
+
+func (p *intValueParser) parse(ctx *parseContext, value string) error {
+	//println("[intValueParser.parse]", value)
+	var err error
+	ctx.parent[p.name], err = strconv.Atoi(value)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *intValueParser) childParser() (NodeParser, error) {
+	return nil, nil
+}
+
 type keyValueListNode struct {
 	name string
 }
 
 func (n *keyValueListNode) childNode(name string) (SchemaNode, error) {
-	//println("ERRR:", name)
 	return &keyValueListNode{name: name}, nil
 }
 
@@ -450,115 +478,6 @@ func (p *customTokensNodeParser) parse(ctx *parseContext, value string) error {
 func (p *customTokensNodeParser) childParser() (NodeParser, error) {
 	return nil, nil
 }
-
-//GetDadlSchema returns dadl schema
-func GetDadlSchema() DadlSchema {
-	return &dadlSchemaImpl{root: &genericSchemaNode{
-		children: map[string]SchemaNode{
-			"types": &dadlSchemaTypeNode{},
-			"structure": &genericSchemaNode{
-				children: map[string]SchemaNode{
-					"long name": &stringValueNode{"long name"},
-				},
-			},
-		},
-	}}
-}
-
-/////////////
-
-type dadlSchemaTypeNode struct {
-}
-
-func (n *dadlSchemaTypeNode) childNode(name string) (SchemaNode, error) {
-	panic("NOT IMPLEMENTED")
-}
-
-func (n *dadlSchemaTypeNode) childParser() (NodeParser, error) {
-	return &dadlSchemaTypeParser{}, nil
-}
-
-var typeBaseRe = regexp.MustCompile("(?P<name>" + regexIdentifier + ")\\s+(?P<baseType>" + regexIdentifier + ")(?P<extra>.*)")
-var listTypeArgsRe = regexp.MustCompile("(?P<itemType>[a-zA-Z0-9-_]+)(\\s+as\\s+(?P<mappedType>[a-zA-Z0-9-_]+)(\\[(?P<mappedTypeArg1>[a-zA-Z0-9-_]+)\\](?P<mappedTypeArg2>[a-zA-Z0-9-_]+)?)?)?")
-
-// typeDefs list typeDef as map[name]type
-
-type dadlSchemaTypeParser struct {
-}
-
-func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
-	println("[dadlSchemaTypeParser.parse]", value)
-
-	res := map[string]string{}
-	match := typeBaseRe.FindStringSubmatch(strings.TrimSpace(value))
-	// var keyValue string
-	if match != nil {
-		for i, name := range typeBaseRe.SubexpNames() {
-			if i != 0 && name != "" {
-				res[name] = match[i]
-			}
-		}
-	}
-	baseType := res["baseType"]
-	extra := res["extra"]
-	result := Node{
-		"baseType": baseType,
-	}
-	ctx.parent[res["name"]] = result
-
-	if baseType == "enum" {
-		parseEnumArgs(&parseContext{
-			parentSchema: ctx.parentSchema,
-			lastSchema:   ctx.lastSchema,
-			parent:       result,
-			last:         result,
-		}, strings.TrimSpace(extra), "values")
-	} else if baseType == "list" {
-		parseListTypeArgs(&parseContext{
-			parentSchema: ctx.parentSchema,
-			lastSchema:   ctx.lastSchema,
-			parent:       result,
-			last:         result,
-		}, strings.TrimSpace(extra), "values")
-	}
-
-	return nil
-}
-
-func (p *dadlSchemaTypeParser) childParser() (NodeParser, error) {
-	panic("NOT IMPLEMENTED")
-}
-
-func parseEnumArgs(ctx *parseContext, value string, key string) error {
-	ctx.parent[key] = strings.Split(value, " ")
-	return nil
-}
-
-func parseListTypeArgs(ctx *parseContext, value string, key string) error {
-	match := listTypeArgsRe.FindStringSubmatch(strings.TrimSpace(value))
-	// var keyValue string
-	res := map[string]string{}
-	if match != nil {
-		for i, name := range listTypeArgsRe.SubexpNames() {
-			if i != 0 && name != "" {
-				res[name] = match[i]
-			}
-		}
-	}
-	ctx.parent["itemType"] = res["itemType"]
-	if res["mappedType"] != "" {
-		mapped := map[string]string{}
-		mapped["mappedType"] = res["mappedType"]
-		mapped["mappedTypeArg1"] = res["mappedTypeArg1"]
-		mapped["mappedTypeArg2"] = res["mappedTypeArg2"]
-		ctx.parent["mapped"] = mapped
-	}
-	return nil
-}
-
-// [types]
-// operation enum GET POST PUT PATCH DELETE
-// typeDef sequence <name identifier> <SPACE> <type identifier> (<SPACE> '#' <desc string>)?
 
 func removeQuotes(val string) string {
 	if strings.HasPrefix(val, "'") && strings.HasSuffix(val, "'") {

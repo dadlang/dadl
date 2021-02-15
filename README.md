@@ -1,4 +1,4 @@
-### Sample schema 
+### Simple schema and data file
 Create sample schema file `sample.dads`
 
     @schema dadl 0.1
@@ -44,9 +44,9 @@ Then you can just put multiline text data as a value
             name: Martin D'vloper
             job: Developer
     someDadl
-        martin
-            name Martin D'vloper
-            job Developer
+        [martin]
+        name Martin D'vloper
+        job Developer
     someBrainfuck
         ++++++++++[>+>+++>+++++++>+++++
         +++++<<<<-]>>>++.>+.+++++++..++
@@ -63,7 +63,7 @@ Create sample schema file `sample_teleport.dads`
             nestedChild
                 evenMoreNasted string
 
-Then to save yourself from indention hell you can just teleport to given node using braces []. Every line fallowing teleport is considerd as a child of that node.
+Then to save yourself from indention hell you can just teleport to given node using braces []. Every line following teleport is considerd as a child of that node.
 
     @schema embedded_text_sample.dads
 
@@ -71,7 +71,7 @@ Then to save yourself from indention hell you can just teleport to given node us
     evenMoreNasted some value
 
 
-### Embedding data from external file
+## Embedding data from external file
 It's possible to import external file as a node value. Create `import_file.dads'
 
     @schema dadl 0.1
