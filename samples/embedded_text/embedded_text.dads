@@ -1,0 +1,7 @@
+@schema dadl 0.1
+
+[structure]
+someJson string
+someYaml string
+someDadl string
+someBrainfuck string

@@ -35,6 +35,10 @@ func (n *dadlSchemaTypeNode) childParser() (NodeParser, error) {
 	return &dadlSchemaTypeParser{}, nil
 }
 
+func (n *dadlSchemaTypeNode) isSimple() bool {
+	return false
+}
+
 type dadlSchemaTypeParser struct {
 }
 
@@ -103,6 +107,10 @@ func (n *dadlStructureSchemaNode) childNode(name string) (SchemaNode, error) {
 
 func (n *dadlStructureSchemaNode) childParser() (NodeParser, error) {
 	return &dadlSchemaTypeParser{}, nil
+}
+
+func (n *dadlStructureSchemaNode) isSimple() bool {
+	return false
 }
 
 func parseEnumArgs(ctx *parseContext, value string, key string) error {

@@ -36,7 +36,7 @@ type testCase struct {
 
 var testCases = []testCase{
 	{
-		name:     "simple schema",
+		name:     "simple test",
 		testFile: "simple/simple.dad",
 		expected: Node{
 			"someRoot": Node{
@@ -45,6 +45,27 @@ var testCases = []testCase{
 					"nestedChild": 7,
 				},
 			},
+		},
+	},
+	{
+		name:     "embedded text test",
+		testFile: "embedded_text/embedded_text.dad",
+		expected: Node{
+			"someJson": `{
+	"martin": {
+		"name": "Martin D'vloper",
+		"job": "Developer"
+	}
+}`,
+			"someYaml": `martin:
+	name: Martin D'vloper
+	job: Developer`,
+			"someDadl": `[martin]
+name Martin D'vloper
+job Developer`,
+			"someBrainfuck": `++++++++++[>+>+++>+++++++>+++++
++++++<<<<-]>>>++.>+.+++++++..++
++.<<++.>----.---.+++.++++++++.`,
 		},
 	},
 }

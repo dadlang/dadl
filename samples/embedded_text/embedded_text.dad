@@ -1,0 +1,21 @@
+@schema embedded_text.dads
+
+someJson
+	{
+		"martin": {
+			"name": "Martin D'vloper",
+			"job": "Developer"
+		}
+	}
+someYaml
+	martin:	
+		name: Martin D'vloper
+		job: Developer
+someDadl
+	[martin]
+	name Martin D'vloper
+	job Developer
+someBrainfuck
+	++++++++++[>+>+++>+++++++>+++++
+	+++++<<<<-]>>>++.>+.+++++++..++
+	+.<<++.>----.---.+++.++++++++.

@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"regexp"
@@ -23,12 +24,12 @@ var groupRe = regexp.MustCompile("^\\[(?P<treePath>[a-zA-Z0-9-_.]*)\\s*(?:<<\\s*
 //Parse - scans given stream
 func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, error) {
 	tree := Node{}
-	ctxByIndent := make([]parseContext, 100)
-	ctx := parseContext{parent: tree, parentSchema: nil}
+	ctxByIndent := make([]*parseContext, 100)
+	ctx := &parseContext{parent: tree, parentSchema: nil}
 	//fmt.Printf("CTX -> %x\n", ctx)
 	var err error
 
-	ctxByIndent = make([]parseContext, 100)
+	ctxByIndent = make([]*parseContext, 100)
 	ctxByIndent[0] = ctx
 
 	scanner := bufio.NewScanner(reader)
@@ -48,34 +49,35 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 			if err != nil {
 				return nil, err
 			}
-			ctxByIndent = make([]parseContext, 100)
+			ctxByIndent = make([]*parseContext, 100)
 			ctxByIndent[0] = ctx
 		} else if strings.TrimSpace(line) != "" {
 			if strings.HasPrefix(line, "#") {
 				//	fmt.Println("skip comment:", line)
 			} else if strings.HasPrefix(line, "@") {
 				//		fmt.Println("magic ->", line)
-				err := p.parseMagic(&ctx, line, resources)
+				err := p.parseMagic(ctx, line, resources)
 				if err != nil {
 					return nil, err
 				}
 			} else {
 				if indentWeight > ctx.indentWeight {
-					//			println("Indent found: " + line)
-					ctx = parseContext{parent: ctx.last, parentSchema: ctx.lastSchema, indentWeight: indentWeight}
-					//			fmt.Printf("CTX -> %x\n", ctx)
+					// println("Indent found: " + line)
+					ctx = &parseContext{parent: ctx.last, parentSchema: ctx.lastSchema, indentWeight: indentWeight}
+					// fmt.Printf("CTX -> %v\n", ctx)
 					ctxByIndent[indentWeight] = ctx
 				} else if indentWeight < ctx.indentWeight {
-					//			println("Find by indent: ", indentWeight)
+					println("Find by indent: ", indentWeight)
 					ctx = ctxByIndent[indentWeight]
-					//		fmt.Printf("CTX -> %x\n", ctx)
+					fmt.Printf("CTX -> %+v\n", ctx)
 				}
 
+				println("Parse line:", line)
 				parser, err := ctx.parentSchema.childParser()
 				if err != nil {
 					return nil, err
 				}
-				if err := parser.parse(&ctx, line); err != nil {
+				if err := parser.parse(ctx, line); err != nil {
 					return nil, err
 				}
 
@@ -94,7 +96,7 @@ type parseContext struct {
 	indentWeight int
 }
 
-func (p *Parser) processGroup(line string, tree map[string]interface{}, resources ResourceProvider) (parseContext, error) {
+func (p *Parser) processGroup(line string, tree map[string]interface{}, resources ResourceProvider) (*parseContext, error) {
 	//fmt.Println(line)
 	match := groupRe.FindStringSubmatch(line)
 	if match != nil {
@@ -118,7 +120,7 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 		}
 		schemaNode, err := p.schema.getNode(treePath)
 		if err != nil {
-			return parseContext{}, err
+			return nil, err
 		}
 
 		if importPath != "" {
@@ -131,7 +133,7 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 			parser := newParserWithSchema(&dadlSchemaImpl{root: schemaNode})
 			value, err := parser.Parse(file, resources)
 			if err != nil {
-				return parseContext{}, err
+				return nil, err
 			}
 			for k, v := range value {
 				node[k] = v
@@ -143,9 +145,9 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 		// 	return parseContext{}, err
 		// }
 
-		return parseContext{parent: node, parentSchema: schemaNode, indentWeight: 0}, nil
+		return &parseContext{parent: node, parentSchema: schemaNode, indentWeight: 0}, nil
 	}
-	return parseContext{}, nil
+	return &parseContext{}, nil
 }
 
 func calcIndentWeight(line string) int {
