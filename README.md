@@ -53,7 +53,7 @@ Then you can just put multiline text data as a value
         +.<<++.>----.---.+++.++++++++.
 
 ### Teleporting to given node
-Create sample schema file `sample_teleport.dads`
+Create sample schema file `teleport.dads`
 
     @schema dadl 0.1
 
@@ -65,7 +65,7 @@ Create sample schema file `sample_teleport.dads`
 
 Then to save yourself from indention hell you can just teleport to given node using braces []. Every line following teleport is considerd as a child of that node.
 
-    @schema embedded_text_sample.dads
+    @schema teleport.dads
 
     [someRoot.firstChild.nestedChild]     
     evenMoreNasted some value

@@ -68,4 +68,26 @@ job Developer`,
 +.<<++.>----.---.+++.++++++++.`,
 		},
 	},
+	{
+		name:     "teleport test",
+		testFile: "teleport/teleport.dad",
+		expected: Node{
+			"someRoot": Node{
+				"firstChild": Node{
+					"nestedChild": Node{
+						"evenMoreNasted": "some value",
+					},
+				},
+			},
+		},
+	},
+	{
+		name:     "import text file test",
+		testFile: "import_text_file/import_text_file.dad",
+		expected: Node{
+			"someBrainfuck": `++++++++++[>+>+++>+++++++>+++++
++++++<<<<-]>>>++.>+.+++++++..++
++.<<++.>----.---.+++.++++++++.`,
+		},
+	},
 }

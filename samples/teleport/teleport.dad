@@ -1,0 +1,4 @@
+@schema teleport.dads
+
+[someRoot.firstChild.nestedChild]     
+evenMoreNasted some value

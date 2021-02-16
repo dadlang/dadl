@@ -21,6 +21,15 @@
             "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
             "args": ["export", "./samples/embedded_text/embedded_text.dad", "-f", "json"],
             "cwd": "/Users/krzysiek/Projects/visuo/dadl"
+        },
+        {
+            "name": "Launch import text file",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
+            "args": ["export", "./samples/import_text_file/import_text_file.dad", "-f", "json"],
+            "cwd": "/Users/krzysiek/Projects/visuo/dadl"
         }
     ]
 }

@@ -1,0 +1,4 @@
+@schema dadl 0.1
+
+[structure]
+someBrainfuck string

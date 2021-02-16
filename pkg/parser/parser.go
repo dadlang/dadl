@@ -25,7 +25,10 @@ var groupRe = regexp.MustCompile("^\\[(?P<treePath>[a-zA-Z0-9-_.]*)\\s*(?:<<\\s*
 func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, error) {
 	tree := Node{}
 	ctxByIndent := make([]*parseContext, 100)
-	ctx := &parseContext{parent: tree, parentSchema: nil}
+	ctx := &parseContext{parent: tree}
+	if p.schema != nil {
+		ctx.parentSchema = p.schema.getRoot()
+	}
 	//fmt.Printf("CTX -> %x\n", ctx)
 	var err error
 
@@ -110,7 +113,11 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 		importPath := result["importPath"]
 		parts := strings.Split(treePath, ".")
 		node := tree
+		var nodeParent map[string]interface{}
+		var key string
 		for _, part := range parts {
+			nodeParent = node
+			key = part
 			next, ok := node[part]
 			if !ok {
 				next = map[string]interface{}{}
@@ -135,8 +142,12 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 			if err != nil {
 				return nil, err
 			}
-			for k, v := range value {
-				node[k] = v
+			if schemaNode.isSimple() {
+				nodeParent[key] = value[key]
+			} else {
+				for k, v := range value {
+					node[k] = v
+				}
 			}
 		}
 

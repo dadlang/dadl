@@ -1,0 +1,3 @@
+@schema import_text_file.dads
+
+[someBrainfuck << ./brainfuck.bf]    
