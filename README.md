@@ -102,18 +102,22 @@ Create `custom_types.dads'
     networkPort int 0..65535 #Network port number
     address formula <host hostname> ':' <port networkPort>
     addresses sequence address
-    resource binary base64
 
     [structure]
-    nodes addresses
     sampleEnum httpVerb
+    sampleHostname hostname
+    samplePort networkPort
+    sampleNode address
+    sampleNodes addresses
 
 And create data file `custom_types.dad`
 
     @schema custom_types.dads
     
-    nodes node1:9042 node2:9042 node2:9042
     sampleEnum GET
-    resource ABEiM0RVZneImaq7zN3u/w==
+    sampleHostname node1
+    samplePort 9042
+    sampleNode node1:9042
+    sampleNodes node1:9042 node2:9042 node2:9042
 
          

@@ -1,5 +1,8 @@
 @schema custom_types.dads
 
-nodes node1:9042 node2:9042 node2:9042
+sampleInlineEnum OK
 sampleEnum GET
-image ABEiM0RVZneImaq7zN3u/w==
+sampleHostname node1
+samplePort 9042
+sampleAddress node1:9042
+sampleAddresses node1:9042 node2:9042 node3:9042

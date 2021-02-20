@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"regexp"
@@ -70,12 +69,12 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 					// fmt.Printf("CTX -> %v\n", ctx)
 					ctxByIndent[indentWeight] = ctx
 				} else if indentWeight < ctx.indentWeight {
-					println("Find by indent: ", indentWeight)
+					// println("Find by indent: ", indentWeight)
 					ctx = ctxByIndent[indentWeight]
-					fmt.Printf("CTX -> %+v\n", ctx)
+					// fmt.Printf("CTX -> %+v\n", ctx)
 				}
 
-				println("Parse line:", line)
+				// println("Parse line:", line)
 				parser, err := ctx.parentSchema.childParser()
 				if err != nil {
 					return nil, err
@@ -174,10 +173,10 @@ func (p *Parser) parseMagic(ctx *parseContext, line string, resources ResourcePr
 	if strings.HasPrefix(line, "@schema ") {
 		var err error
 		p.schema, err = parseSchema(line[8:], resources)
-		ctx.parentSchema = p.schema.getRoot()
 		if err != nil {
 			return err
 		}
+		ctx.parentSchema = p.schema.getRoot()
 	} else {
 		println("UNKNOW MAGIC")
 	}

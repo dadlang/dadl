@@ -23,7 +23,7 @@ func TestParserE2E(t *testing.T) {
 			t.Fatalf("could not parse %v", tc.testFile)
 		}
 		if !reflect.DeepEqual(got, tc.expected) {
-			t.Errorf("[%s] = %+v; want %+v", tc.testFile, got, tc.expected)
+			t.Errorf("%s[%s]\nGOT:  %+v \nWANT: %+v", tc.name, tc.testFile, got, tc.expected)
 		}
 	}
 }
@@ -88,6 +88,34 @@ job Developer`,
 			"someBrainfuck": `++++++++++[>+>+++>+++++++>+++++
 +++++<<<<-]>>>++.>+.+++++++..++
 +.<<++.>----.---.+++.++++++++.`,
+		},
+	},
+	{
+		name:     "custom types test",
+		testFile: "custom_types/custom_types.dad",
+		expected: Node{
+			"sampleEnum":       "GET",
+			"sampleInlineEnum": "OK",
+			"sampleHostname":   "node1",
+			"samplePort":       9042,
+			"sampleAddress": Node{
+				"host": "node1",
+				"port": 9042,
+			},
+			"sampleAddresses": []interface{}{
+				Node{
+					"host": "node1",
+					"port": 9042,
+				},
+				Node{
+					"host": "node2",
+					"port": 9042,
+				},
+				Node{
+					"host": "node3",
+					"port": 9042,
+				},
+			},
 		},
 	},
 }

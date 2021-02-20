@@ -66,7 +66,7 @@ type simpleValueParser struct {
 }
 
 func (p *simpleValueParser) parse(ctx *parseContext, value string) error {
-	println("[simpleValueParser.parse]", value)
+	// println("[simpleValueParser.parse]", value)
 	parsed, err := p.valueType.parse(value)
 	if err != nil {
 		return err

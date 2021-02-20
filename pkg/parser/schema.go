@@ -94,7 +94,7 @@ func (n *genericSchemaNode) isSimple() bool {
 type keyWithDelegatedValueParser struct{}
 
 func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) error {
-	println("[keyWithDelegatedValueParser.parse]", value)
+	// println("[keyWithDelegatedValueParser.parse]", value)
 
 	res := map[string]string{}
 	match := keyWithDelegatedValueRe.FindStringSubmatch(strings.TrimSpace(value))
@@ -148,10 +148,10 @@ func (p *stringValueParser) parse(ctx *parseContext, value string) error {
 	}
 	value = value[*p.indent:]
 	if ctx.parent[p.name] == nil {
-		println("SET[", p.name, "]", value)
+		// println("SET[", p.name, "]", value)
 		ctx.parent[p.name] = value
 	} else {
-		println("APPEND[", p.name, "]", value)
+		// println("APPEND[", p.name, "]", value)
 		ctx.parent[p.name] = ctx.parent[p.name].(string) + "\n" + value
 	}
 	ctx.last = ctx.parent
