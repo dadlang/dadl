@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -27,6 +29,10 @@ func GetDadlSchema() DadlSchema {
 type dadlSchemaTypeNode struct {
 }
 
+func (n *dadlSchemaTypeNode) valueType() valueType {
+	return nil
+}
+
 func (n *dadlSchemaTypeNode) childNode(name string) (SchemaNode, error) {
 	return n, nil
 }
@@ -43,7 +49,7 @@ type dadlSchemaTypeParser struct {
 }
 
 func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
-	// println("[dadlSchemaTypeParser.parse]", value)
+	println("[dadlSchemaTypeParser.parse]", value)
 
 	var err error
 	res := map[string]string{}
@@ -99,6 +105,10 @@ func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
 
 type dadlStructureSchemaNode struct {
 	children map[string]SchemaNode
+}
+
+func (n *dadlStructureSchemaNode) valueType() valueType {
+	return nil
 }
 
 func (n *dadlStructureSchemaNode) childNode(name string) (SchemaNode, error) {
@@ -157,32 +167,112 @@ func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, err
 		return nil, err
 	}
 
-	// fmt.Printf("Parsed schema tree: %X\n", tree)
-	root, err := buildGenericNode(tree["structure"].(map[string]interface{}))
+	fmt.Printf("Parsed schema tree: %v\n", tree)
+
+	var typesMap map[string]valueType
+
+	if tree["types"] != nil {
+		typesMap, err = buildTypes(tree["types"].(map[string]interface{}))
+		if err != nil {
+			return nil, err
+		}
+	}
+	fmt.Printf("Types: %v\n", typesMap)
+
+	root, err := buildGenericNode(tree["structure"].(map[string]interface{}), typesMap)
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Printf("Schema: %X\n", root)
+	fmt.Printf("Schema: %v\n", root)
 	return &dadlSchemaImpl{root: root}, nil
 }
 
-func buildGenericNode(children map[string]interface{}) (SchemaNode, error) {
+func buildTypes(typesDef map[string]interface{}) (map[string]valueType, error) {
+	resolvedTypes := map[string]valueType{}
+	for key := range typesDef {
+		resolveType(key, typesDef, resolvedTypes)
+	}
+	return resolvedTypes, nil
+}
+
+func buildType(typeDef map[string]interface{}, typesDefs map[string]interface{}, resolvedTypes map[string]valueType) (valueType, error) {
+	switch typeDef["baseType"] {
+	case "string":
+		return &stringValue{}, nil
+	case "int":
+		return &intValue{}, nil
+	case "enum":
+		enumValue := &enumValue{values: map[string]bool{}}
+		for _, value := range typeDef["values"].([]string) {
+			enumValue.values[value] = true
+		}
+		return enumValue, nil
+	case "formula":
+		return &formulaValue{}, nil
+	case "sequence":
+		return &sequenceValue{}, nil
+	case "binary":
+		return &binaryValue{}, nil
+	}
+	return nil, errors.New("Unknown type: " + typeDef["baseType"].(string))
+}
+
+func resolveType(typeName string, typesDefs map[string]interface{}, resolvedTypes map[string]valueType) (valueType, error) {
+	if resolved, ok := resolvedTypes[typeName]; ok {
+		return resolved, nil
+	}
+	var err error
+
+	typeDef := typesDefs[typeName].(map[string]interface{})
+	if typeDef == nil {
+		return nil, errors.New("Unknown type: " + typeName)
+	}
+	resolvedTypes[typeName], err = buildType(typeDef, typesDefs, resolvedTypes)
+	if err != nil {
+		return nil, err
+	}
+	return resolvedTypes[typeName], nil
+}
+
+func buildGenericNode(children map[string]interface{}, typesMap map[string]valueType) (SchemaNode, error) {
+	// baseTypes := []string{"string", "int", "enum", "struct"}
 	node := &genericSchemaNode{children: map[string]SchemaNode{}}
+	var err error
 
 	for key, value := range children {
 		value := value.(map[string]interface{})
-		baseType := value["baseType"]
+		baseType := value["baseType"].(string)
+
 		if baseType == "struct" {
-			child, err := buildGenericNode(value["children"].(map[string]interface{}))
+			child, err := buildGenericNode(value["children"].(map[string]interface{}), typesMap)
 			if err != nil {
 				return nil, err
 			}
 			node.children[key] = child
-		} else if baseType == "string" {
-			node.children[key] = &stringValueNode{name: key}
-		} else if baseType == "int" {
-			node.children[key] = &intValueNode{name: key}
+		} else {
+
+			valueType, ok := typesMap[baseType]
+			if !ok {
+				valueType, err = buildType(value, nil, typesMap)
+				if err != nil {
+					return nil, err
+				}
+			}
+			_, isString := valueType.(*stringValue)
+			if isString {
+				node.children[key] = &stringValueNode{name: key}
+			} else {
+				node.children[key] = &simpleValueLeafNode{name: key, valueType: valueType}
+			}
 		}
+		// else if baseType == "string" {
+		// 	node.children[key] = &stringValueNode{name: key}
+		// } else if baseType == "int" {
+		// 	node.children[key] = &intValueNode{name: key}
+		// }
+		// else if baseType == "enum" {
+		// 	node.children[key] = &enumValueNode{name: key}
+		// }
 	}
 	return node, nil
 }

@@ -1,0 +1,14 @@
+@schema dadl 0.1
+
+[types]
+httpVerb enum GET POST PUT PATCH DELETE
+hostname string \S+
+networkPort int 0..65535 #Network port number
+address formula <host hostname> ':' <port networkPort>
+addresses sequence address
+resource binary base64
+
+[structure]
+nodes addresses
+sampleEnum httpVerb
+image resource

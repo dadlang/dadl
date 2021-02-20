@@ -70,6 +70,10 @@ type genericSchemaNode struct {
 	children map[string]SchemaNode
 }
 
+func (n *genericSchemaNode) valueType() valueType {
+	return nil
+}
+
 func (n *genericSchemaNode) childNode(name string) (SchemaNode, error) {
 	val, ok := n.children[name]
 	if !ok {
@@ -85,22 +89,6 @@ func (n *genericSchemaNode) childParser() (NodeParser, error) {
 
 func (n *genericSchemaNode) isSimple() bool {
 	return false
-}
-
-type intValueNode struct {
-	name string
-}
-
-func (n *intValueNode) childNode(name string) (SchemaNode, error) {
-	return nil, nil
-}
-
-func (n *intValueNode) childParser() (NodeParser, error) {
-	return &intValueParser{name: n.name}, nil
-}
-
-func (n *intValueNode) isSimple() bool {
-	return true
 }
 
 type keyWithDelegatedValueParser struct{}
@@ -146,23 +134,6 @@ func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) err
 
 func (p *keyWithDelegatedValueParser) childParser() (NodeParser, error) {
 	return &keyWithDelegatedValueParser{}, nil
-}
-
-type stringValueNode struct {
-	name   string
-	indent int
-}
-
-func (n *stringValueNode) childNode(name string) (SchemaNode, error) {
-	return n, nil
-}
-
-func (n *stringValueNode) childParser() (NodeParser, error) {
-	return &stringValueParser{name: n.name, indent: &n.indent}, nil
-}
-
-func (n *stringValueNode) isSimple() bool {
-	return true
 }
 
 type stringValueParser struct {
@@ -305,6 +276,10 @@ type childListOnlyNode struct {
 	childType SchemaNode
 }
 
+func (n *childListOnlyNode) valueType() valueType {
+	return nil
+}
+
 func (n *childListOnlyNode) childNode(name string) (SchemaNode, error) {
 	return n.childType, nil
 }
@@ -319,6 +294,10 @@ func (n *childListOnlyNode) isSimple() bool {
 
 type identifierListNode struct {
 	childType SchemaNode
+}
+
+func (n *identifierListNode) valueType() valueType {
+	return nil
 }
 
 func (n *identifierListNode) childNode(name string) (SchemaNode, error) {
@@ -461,6 +440,10 @@ func (t regexToken) transform(value string) interface{} {
 type customTokensNode struct {
 	tokens       []TokenSpec
 	keyTokenName string
+}
+
+func (n *customTokensNode) valueType() valueType {
+	return nil
 }
 
 func (n *customTokensNode) childNode(name string) (SchemaNode, error) {

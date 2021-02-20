@@ -72,7 +72,7 @@ Then to save yourself from indention hell you can just teleport to given node us
 
 
 ## Embedding data from external file
-It's possible to import external file as a node value. Create `import_file.dads'
+It's possible to import external file as a node value. Create `import_text_file.dads'
 
     @schema dadl 0.1
 
@@ -87,6 +87,33 @@ Then create attachment file `brainfuck.bf`
 
 And create data file `import_file.dad`
 
-    @schema embedded_text_sample.dads
+    @schema import_text_file.dads
 
     [someBrainfuck << ./brainfuck.bf]     
+
+## Custom types
+Create `custom_types.dads'
+
+    @schema dadl 0.1
+
+    [types]
+    httpVerb enum GET POST PUT PATCH DELETE
+    hostname string \S+
+    networkPort int 0..65535 #Network port number
+    address formula <host hostname> ':' <port networkPort>
+    addresses sequence address
+    resource binary base64
+
+    [structure]
+    nodes addresses
+    sampleEnum httpVerb
+
+And create data file `custom_types.dad`
+
+    @schema custom_types.dads
+    
+    nodes node1:9042 node2:9042 node2:9042
+    sampleEnum GET
+    resource ABEiM0RVZneImaq7zN3u/w==
+
+         

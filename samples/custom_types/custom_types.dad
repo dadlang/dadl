@@ -1,0 +1,5 @@
+@schema custom_types.dads
+
+nodes node1:9042 node2:9042 node2:9042
+sampleEnum GET
+image ABEiM0RVZneImaq7zN3u/w==
