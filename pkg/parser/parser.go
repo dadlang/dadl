@@ -138,7 +138,7 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 			node = next.(map[string]interface{})
 		}
 		if p.schema == nil {
-			return nil, errors.New("Missing schema info")
+			return nil, errors.New("Missing schema info for path: " + treePath)
 		}
 		schemaNode, err := p.schema.getNode(treePath)
 		if err != nil {

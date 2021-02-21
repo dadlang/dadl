@@ -53,19 +53,6 @@ func (s *dadlSchemaImpl) getNode(nodePath string) (SchemaNode, error) {
 	return node, nil
 }
 
-// func (s *dadlSchemaImpl) parser(nodePath string) (NodeParser, error) {
-// 	node := s.root
-// 	var err error
-// 	pathElements := strings.Split(nodePath, ".")
-// 	for _, pathElement := range pathElements {
-// 		node, err = node.childNode(pathElement)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
-// 	return node.childParser(), nil
-// }
-
 type genericSchemaNode struct {
 	children map[string]SchemaNode
 }
@@ -150,10 +137,6 @@ func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) err
 	return nil
 }
 
-func (p *keyWithDelegatedValueParser) childParser() (NodeParser, error) {
-	return &keyWithDelegatedValueParser{}, nil
-}
-
 type stringValueParser struct {
 	name   string
 	indent *int
@@ -177,10 +160,6 @@ func (p *stringValueParser) parse(ctx *parseContext, value string) error {
 	return nil
 }
 
-func (p *stringValueParser) childParser() (NodeParser, error) {
-	return nil, nil
-}
-
 type intValueParser struct {
 	name string
 }
@@ -194,26 +173,6 @@ func (p *intValueParser) parse(ctx *parseContext, value string) error {
 	}
 	return nil
 }
-
-func (p *intValueParser) childParser() (NodeParser, error) {
-	return nil, nil
-}
-
-// type keyValueListNode struct {
-// 	name string
-// }
-
-// func (n *keyValueListNode) childNode(name string) (SchemaNode, error) {
-// 	return &keyValueListNode{name: name}, nil
-// }
-
-// func (n *keyValueListNode) childParser() (NodeParser, error) {
-// 	return &genericKeyValueParser{node: n}, nil
-// }
-
-// func (n *keyValueListNode) isSimple() bool {
-// 	return true
-// }
 
 type genericKeyValueParser struct {
 	node SchemaNode
@@ -231,64 +190,9 @@ func (p *genericKeyValueParser) parse(ctx *parseContext, value string) error {
 	return nil
 }
 
-func (p *genericKeyValueParser) childParser() (NodeParser, error) {
-	return &genericKeyValueParser{node: p.node}, nil
-}
-
 func (p *genericKeyValueParser) isSimple() bool {
 	return false
 }
-
-// type customItemListNode struct {
-// 	name string
-// }
-
-// func (n *customItemListNode) childNode(name string) (SchemaNode, error) {
-// 	return nil, nil
-// }
-
-// func (n *customItemListNode) parser() NodeParser {
-// 	return &customValueParser{}
-// }
-
-// type customValueParser struct{}
-
-// func (p *customValueParser) parse(ctx *parseContext, value string) error {
-// 	println("[customValueParser.parse]", value)
-
-// 	re := regexp.MustCompile("(?P<key>[a-zA-Z0-9-_]+)(?P<optional>[?])?\\s+(?P<type>[a-zA-Z0-9-_]+)\\s+(?:#(?P<desc>.*))?")
-
-// 	parsed := matchRegexp(re, strings.TrimSpace(value))
-
-// 	ctx.parent[parsed["key"]] = Node{
-// 		"type":     parsed["type"],
-// 		"desc":     parsed["desc"],
-// 		"optional": flagToBool(parsed["optional"]),
-// 	}
-// 	return nil
-// }
-
-// func flagToBool(val string) bool {
-// 	return val != ""
-// }
-
-// func matchRegexp(re *regexp.Regexp, value string) map[string]string {
-// 	println("MATCH:", value)
-// 	match := re.FindStringSubmatch(value)
-// 	result := make(map[string]string)
-// 	if match != nil {
-// 		for i, name := range re.SubexpNames() {
-// 			if i != 0 && name != "" {
-// 				result[name] = match[i]
-// 			}
-// 		}
-// 	}
-// 	return result
-// }
-
-// func (p *customValueParser) childParser() (NodeParser, error) {
-// 	return nil, nil
-// }
 
 type childListOnlyNode struct {
 	childType SchemaNode
@@ -342,10 +246,6 @@ func (p *genericKeyParser) parse(ctx *parseContext, value string) error {
 	ctx.last = v
 	ctx.lastSchema = p.childType
 	return nil
-}
-
-func (p *genericKeyParser) childParser() (NodeParser, error) {
-	return p.childType.childParser()
 }
 
 //ParseSchema parses schema
@@ -525,13 +425,21 @@ func (p *customTokensNodeParser) parse(ctx *parseContext, value string) error {
 	return nil
 }
 
-func (p *customTokensNodeParser) childParser() (NodeParser, error) {
-	return nil, nil
-}
-
 func removeQuotes(val string) string {
 	if strings.HasPrefix(val, "'") && strings.HasSuffix(val, "'") {
 		return val[1 : len(val)-1]
 	}
 	return val
+}
+
+type customItemListNode struct {
+	value SchemaNode
+}
+
+func (n *customItemListNode) childNode(name string) (SchemaNode, error) {
+	return n.value, nil
+}
+
+func (n *customItemListNode) childParser() NodeParser {
+	return &keyWithDelegatedValueParser{}
 }

@@ -14,7 +14,7 @@ import (
 
 var typeBaseRe = regexp.MustCompile("(?P<name>" + regexIdentifier + ")(\\s+(?P<baseType>" + regexIdentifier + "))?(?P<extra>.*)")
 var listTypeArgsRe = regexp.MustCompile("(?P<itemType>[a-zA-Z0-9-_]+)(\\s+as\\s+(?P<mappedType>[a-zA-Z0-9-_]+)(\\[(?P<mappedTypeArg1>[a-zA-Z0-9-_]+)\\](?P<mappedTypeArg2>[a-zA-Z0-9-_]+)?)?)?")
-var formulaTypeArgsRe = regexp.MustCompile("(?:\\<(?P<name>" + regexIdentifier + ")\\s+(?P<baseType>" + regexIdentifier + ")\\>)|(?:\\'(?P<literal>.*)\\')")
+var formulaTypeArgsRe = regexp.MustCompile("(?:\\<(?P<name>" + regexIdentifier + ")\\s+(?P<baseType>" + regexIdentifier + ")\\>)|(?:\\'(?P<literal>.*?)\\')")
 
 //GetDadlSchema returns dadl schema
 func GetDadlSchema() DadlSchema {
@@ -241,6 +241,12 @@ func buildGenericNode(children map[string]interface{}, typeResolver *typeResolve
 				return nil, err
 			}
 			node.children[key] = child
+		} else if baseType == "list" {
+			child, err := buildListNode(value["value"].(map[string]interface{}), typeResolver)
+			if err != nil {
+				return nil, err
+			}
+			node.children[key] = child
 		} else {
 			valueType, err := typeResolver.buildType(value)
 			if err != nil {
@@ -258,6 +264,14 @@ func buildGenericNode(children map[string]interface{}, typeResolver *typeResolve
 }
 
 func buildMapNode(value map[string]interface{}, typeResolver *typeResolver) (SchemaNode, error) {
+	node, err := buildGenericNode(value, typeResolver)
+	if err != nil {
+		return nil, err
+	}
+	return &genericMapNode{value: node}, nil
+}
+
+func buildListNode(value map[string]interface{}, typeResolver *typeResolver) (SchemaNode, error) {
 	node, err := buildGenericNode(value, typeResolver)
 	if err != nil {
 		return nil, err

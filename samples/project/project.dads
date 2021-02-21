@@ -1,28 +1,15 @@
-#@schema dadl 0.1
+@schema dadl 0.1
 
 [types]
-operation enum GET POST PUT PATCH DELETE
+identifier string [A-Za-z0-9_-]*
+typeDef formula <name identifier> ' ' <type identifier> ' #' <desc string>
 
-humanAge integer 0..199 #age of the human in range 0-199
-
-#typeDef formula <name identifier> <SPACE> <type identifier> [<SPACE> "#" <desc string>]
-
-#typeDefs list typeDef as map[name]type
-
-#person struct
-#    firstName string
-#    lastName string
-#    age humanAge #age of the person
-#    height integer (0, 300) #person height in cm
-
-    
 [structure]
-'long name' some string value
-#name string
-#codename string
+name string
+codename string
 #global
-#    types typeDefs
-#        SomeType String
-modules
-#    types map[string]string
-#contexts list[typeDef] as map[type]
+#    types list typeDef 
+
+modules map[string]
+    name string
+    namespace string

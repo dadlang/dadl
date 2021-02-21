@@ -7,6 +7,7 @@
 
 
 
+
         {
             "name": "Launch simple",
             "type": "go",
@@ -59,6 +60,15 @@
             "mode": "debug",
             "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
             "args": ["export", "./samples/import_subtree/module.dad", "-f", "json"],
+            "cwd": "/Users/krzysiek/Projects/visuo/dadl"
+        },
+        {
+            "name": "Launch project file",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
+            "args": ["export", "./samples/project/project.dad", "-f", "json"],
             "cwd": "/Users/krzysiek/Projects/visuo/dadl"
         },
         {

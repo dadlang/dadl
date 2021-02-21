@@ -1,7 +1,7 @@
-@schema ../project.dads
+@schema ./project.dads [modules._]
 
 name Sample
 namespace sample
 
-[types]
-Item struct
+#[types]
+#Item struct

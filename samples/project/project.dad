@@ -3,29 +3,26 @@
 name Online Boutique
 codename boutique
 
-global
-    types
-        SomeType String
+#[global.types]
+#SomeType String
 
 [modules.cart << ./modules/sample.dad]
 name overridden
-#types
-#    Additional String
 
 [modules.Another]
 name Anooooother
-types
-    Other String
+#types
+#    Other String
 
-[global.types]
-UserId String
-ProductId String
+#[global.types]
+#UserId String
+#ProductId String
 
-[contexts]
-user
-    userID UserID #Identifier of the user
-user2
-    userID2_1 UserID #Identifier of the user
-    userID2_2? UserID #Identifier of the user
-user3
-    userID3_1? UserID #Identifier of the user
+#[contexts]
+#user
+#    userID UserID #Identifier of the user
+#user2
+#    userID2_1 UserID #Identifier of the user
+#    userID2_2? UserID #Identifier of the user
+#user3
+#    userID3_1? UserID #Identifier of the user
