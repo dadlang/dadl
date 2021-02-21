@@ -188,7 +188,7 @@ func parseListTypeArgs(ctx *parseContext, value string, key string) error {
 
 func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, error) {
 
-	if strings.HasPrefix(schemaName, "dadl ") {
+	if schemaName == "dadl" {
 		return GetDadlSchema(), nil
 	}
 
@@ -217,7 +217,7 @@ func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, err
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Printf("Schema: %v\n", root)
+	fmt.Printf("Schema: %v\n", root)
 	return &dadlSchemaImpl{root: root}, nil
 }
 

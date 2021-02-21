@@ -1,7 +1,7 @@
 @schema dadl 0.1
 
 [structure]
-someRoot
-	firstChild
-		nestedChild
-			evenMoreNasted string
+modules map[string]
+    name string
+    active bool
+

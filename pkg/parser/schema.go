@@ -166,7 +166,7 @@ func (p *stringValueParser) parse(ctx *parseContext, value string) error {
 	}
 	value = value[*p.indent:]
 	if ctx.parent[p.name] == nil {
-		println("SET[", p.name, "]", value)
+		//println("SET[", p.name, "]", value)
 		ctx.parent[p.name] = value
 	} else {
 		// println("APPEND[", p.name, "]", value)
@@ -220,7 +220,7 @@ type genericKeyValueParser struct {
 }
 
 func (p *genericKeyValueParser) parse(ctx *parseContext, value string) error {
-	println("[genericKeyValueParser.parse]", value)
+	// println("[genericKeyValueParser.parse]", value)
 	value = strings.TrimSpace(value)
 	vals := strings.SplitN(value, " ", 2)
 	if len(vals) > 1 {

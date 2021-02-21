@@ -142,4 +142,24 @@ job Developer`,
 			},
 		},
 	},
+	{
+		name:     "import subtree test",
+		testFile: "import_subtree/import_subtree.dad",
+		expected: Node{
+			"modules": Node{
+				"firstModule": Node{
+					"active": true,
+					"name":   "First module",
+				},
+				"secondModule": Node{
+					"active": false,
+					"name":   "Second module",
+				},
+				"thirdModule": Node{
+					"active": true,
+					"name":   "Third module",
+				},
+			},
+		},
+	},
 }

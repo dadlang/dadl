@@ -1,4 +1,11 @@
 @schema import_subtree.dads
 
-[someRoot.firstChild.nestedChild]     
-evenMoreNasted some value
+[modules]     
+firstModule
+    name First module
+    active true
+secondModule
+    name Second module
+    active false
+
+[modules.thirdModule << ./module.dad]

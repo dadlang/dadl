@@ -6,6 +6,7 @@
     "configurations": [
 
 
+
         {
             "name": "Launch simple",
             "type": "go",
@@ -49,6 +50,15 @@
             "mode": "debug",
             "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
             "args": ["export", "./samples/maps/maps.dad", "-f", "json"],
+            "cwd": "/Users/krzysiek/Projects/visuo/dadl"
+        },
+        {
+            "name": "Launch subtree module file",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
+            "args": ["export", "./samples/import_subtree/module.dad", "-f", "json"],
             "cwd": "/Users/krzysiek/Projects/visuo/dadl"
         },
         {

@@ -34,6 +34,17 @@ func (v *stringValue) toRegex() string {
 	return ".*"
 }
 
+type boolValue struct {
+}
+
+func (v *boolValue) parse(value string) (interface{}, error) {
+	return strconv.ParseBool(strings.TrimSpace(value))
+}
+
+func (v *boolValue) toRegex() string {
+	return "(?:true)|(?:false)"
+}
+
 type constantValue struct {
 	value string
 }

@@ -188,11 +188,19 @@ func calcIndentWeight(line string) int {
 func (p *Parser) parseMagic(ctx *parseContext, line string, resources ResourceProvider) error {
 	if strings.HasPrefix(line, "@schema ") {
 		var err error
-		p.schema, err = parseSchema(line[8:], resources)
+		parts := strings.Split(line[8:], " ")
+		p.schema, err = parseSchema(parts[0], resources)
 		if err != nil {
 			return err
 		}
+
 		ctx.parentSchema = p.schema.getRoot()
+		if len(parts) == 2 && strings.HasPrefix(parts[1], "[") && strings.HasSuffix(parts[1], "]") {
+			ctx.parentSchema, err = p.schema.getNode(parts[1][1 : len(parts[1])-1])
+			if err != nil {
+				return err
+			}
+		}
 	} else {
 		println("UNKNOW MAGIC")
 	}

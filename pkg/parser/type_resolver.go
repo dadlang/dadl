@@ -17,6 +17,8 @@ func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, err
 		return &stringValue{regex: typeDef["regex"].(string)}, nil
 	case "int":
 		return &intValue{}, nil
+	case "bool":
+		return &boolValue{}, nil
 	case "enum":
 		enumValue := &enumValue{values: map[string]bool{}}
 		for _, value := range typeDef["values"].([]string) {
