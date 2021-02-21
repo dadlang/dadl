@@ -3,7 +3,6 @@ package parser
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"regexp"
@@ -66,28 +65,28 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 				}
 			} else {
 				if indentWeight > ctx.indentWeight {
-					println("Indent found: " + line)
+					//		println("Indent found: " + line)
 					nextParent := ctx.last
 					if nextParent == nil {
 						nextParent = ctx.parent
 					}
 					ctx = &parseContext{parent: nextParent, parentSchema: ctx.lastSchema, indentWeight: indentWeight}
-					fmt.Printf("CTX[%v] -> %v\n", indentWeight, ctx)
+					//		fmt.Printf("CTX[%v] -> %v\n", indentWeight, ctx)
 					ctxByIndent[indentWeight] = ctx
 				} else if indentWeight < ctx.indentWeight {
-					println("Find by indent: ", indentWeight)
+					//		println("Find by indent: ", indentWeight)
 
 					for j := indentWeight; j >= 0; j-- {
 						if ctxByIndent[j] != nil {
-							println("Return by indent: ", j)
+							//				println("Return by indent: ", j)
 							ctx = ctxByIndent[j]
 							break
 						}
 					}
-					fmt.Printf("CTX -> %+v\n", ctx)
+					//		fmt.Printf("CTX -> %+v\n", ctx)
 				}
 
-				println("Parse line:", line)
+				//	println("Parse line:", line)
 				parser, err := ctx.parentSchema.childParser()
 				if err != nil {
 					return nil, err

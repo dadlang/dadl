@@ -440,6 +440,9 @@ func (n *customItemListNode) childNode(name string) (SchemaNode, error) {
 	return n.value, nil
 }
 
-func (n *customItemListNode) childParser() NodeParser {
-	return &keyWithDelegatedValueParser{}
+func (n *customItemListNode) childParser() (NodeParser, error) {
+	return &keyWithDelegatedValueParser{}, nil
+}
+func (n *customItemListNode) isSimple() bool {
+	return false
 }

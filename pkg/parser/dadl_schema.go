@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 )
@@ -203,7 +202,7 @@ func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, err
 		return nil, err
 	}
 
-	fmt.Printf("Parsed schema tree: %v\n", tree)
+	//fmt.Printf("Parsed schema tree: %v\n", tree)
 
 	var typesDefs map[string]interface{}
 	if tree["types"] != nil {
@@ -217,7 +216,7 @@ func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, err
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("Schema: %v\n", root)
+	//fmt.Printf("Schema: %v\n", root)
 	return &dadlSchemaImpl{root: root}, nil
 }
 
@@ -276,5 +275,5 @@ func buildListNode(value map[string]interface{}, typeResolver *typeResolver) (Sc
 	if err != nil {
 		return nil, err
 	}
-	return &genericMapNode{value: node}, nil
+	return &customItemListNode{value: node}, nil
 }
