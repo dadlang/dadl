@@ -1,0 +1,17 @@
+@schema ./maps.dads
+
+simpleMap
+    firstKey
+        textValue some text value
+        intValue 7
+    secondKey
+        intValue 14
+    thirdKey
+        textValue third
+        
+[simpleMap.fourthKey]
+textValue fourth
+
+[simpleMap]
+fifthKey
+    textValue fifth

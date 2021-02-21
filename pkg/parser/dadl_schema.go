@@ -76,6 +76,10 @@ func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
 		structure := Node{}
 		result["children"] = structure
 		ctx.last = structure
+	} else if baseType == "map" {
+		structure := Node{}
+		result["value"] = structure
+		ctx.last = structure
 	} else {
 		ctx.last = result
 	}
@@ -101,7 +105,6 @@ func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
 	} else if baseType == "sequence" {
 		parseSequenceArgs(newCtx, strings.TrimSpace(extra), "sequence")
 	}
-
 	return nil
 }
 
@@ -232,6 +235,12 @@ func buildGenericNode(children map[string]interface{}, typeResolver *typeResolve
 				return nil, err
 			}
 			node.children[key] = child
+		} else if baseType == "map" {
+			child, err := buildMapNode(value["value"].(map[string]interface{}), typeResolver)
+			if err != nil {
+				return nil, err
+			}
+			node.children[key] = child
 		} else {
 			valueType, err := typeResolver.buildType(value)
 			if err != nil {
@@ -246,4 +255,12 @@ func buildGenericNode(children map[string]interface{}, typeResolver *typeResolve
 		}
 	}
 	return node, nil
+}
+
+func buildMapNode(value map[string]interface{}, typeResolver *typeResolver) (SchemaNode, error) {
+	node, err := buildGenericNode(value, typeResolver)
+	if err != nil {
+		return nil, err
+	}
+	return &genericMapNode{value: node}, nil
 }

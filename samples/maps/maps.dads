@@ -1,0 +1,6 @@
+@schema dadl 0.1
+
+[structure]
+simpleMap map[string]
+    textValue string
+    intValue int

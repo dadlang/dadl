@@ -1,0 +1,4 @@
+@schema import_subtree.dads
+
+[someRoot.firstChild.nestedChild]     
+evenMoreNasted some value

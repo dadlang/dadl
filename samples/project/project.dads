@@ -3,13 +3,11 @@
 [types]
 operation enum GET POST PUT PATCH DELETE
 
-humanAge integer <0:199> #age of the human in range 0-199
+humanAge integer 0..199 #age of the human in range 0-199
 
-typeDef formula <name identifier> <SPACE> <type identifier> [<SPACE> "#" <desc string>]
+#typeDef formula <name identifier> <SPACE> <type identifier> [<SPACE> "#" <desc string>]
 
-typeDefs list typeDef as map[name]type
-
-resource binary base64
+#typeDefs list typeDef as map[name]type
 
 #person struct
 #    firstName string
@@ -25,6 +23,6 @@ resource binary base64
 #global
 #    types typeDefs
 #        SomeType String
-#modules map[string]
+modules
 #    types map[string]string
 #contexts list[typeDef] as map[type]

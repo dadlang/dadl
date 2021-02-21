@@ -57,11 +57,11 @@ func (r *typeResolver) resolveType(typeName string) (valueType, error) {
 	}
 	var err error
 
-	typeDef := r.typesDefs[typeName].(map[string]interface{})
+	typeDef := r.typesDefs[typeName]
 	if typeDef == nil {
-		return nil, errors.New("Unknown type, no definition: " + typeName)
+		return nil, errors.New("Unknown type, no definition for: " + typeName)
 	}
-	r.resolvedTypes[typeName], err = r.buildType(typeDef)
+	r.resolvedTypes[typeName], err = r.buildType(typeDef.(map[string]interface{}))
 	if err != nil {
 		return nil, err
 	}

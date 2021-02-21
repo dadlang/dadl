@@ -118,4 +118,28 @@ job Developer`,
 			},
 		},
 	},
+	{
+		name:     "maps test",
+		testFile: "maps/maps.dad",
+		expected: Node{
+			"simpleMap": Node{
+				"firstKey": Node{
+					"intValue":  7,
+					"textValue": "some text value",
+				},
+				"secondKey": Node{
+					"intValue": 14,
+				},
+				"thirdKey": Node{
+					"textValue": "third",
+				},
+				"fourthKey": Node{
+					"textValue": "fourth",
+				},
+				"fifthKey": Node{
+					"textValue": "fifth",
+				},
+			},
+		},
+	},
 }

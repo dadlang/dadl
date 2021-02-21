@@ -91,6 +91,22 @@ func (n *genericSchemaNode) isSimple() bool {
 	return false
 }
 
+type genericMapNode struct {
+	value SchemaNode
+}
+
+func (n *genericMapNode) childNode(name string) (SchemaNode, error) {
+	return n.value, nil
+}
+
+func (n *genericMapNode) childParser() (NodeParser, error) {
+	return &keyWithDelegatedValueParser{}, nil
+}
+
+func (n *genericMapNode) isSimple() bool {
+	return false
+}
+
 type keyWithDelegatedValueParser struct{}
 
 func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) error {
@@ -114,21 +130,23 @@ func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) err
 	if err != nil {
 		return err
 	}
+	ctx.lastSchema = child
+	ctx.last = nil
 	if !child.isSimple() {
 		node := Node{}
 		ctx.parent[key] = node
-		ctx.parent = node
+		ctx.last = node
 	}
-	ctx.lastSchema = child
 	if res["rest"] != "" {
 		childParser, err := child.childParser()
 		if err != nil {
 			return nil
 		}
 		childParser.parse(ctx, res["rest"])
-	} else {
-		ctx.last = ctx.parent
 	}
+	// else {
+	// 	ctx.last = ctx.parent
+	// }
 	return nil
 }
 
@@ -148,7 +166,7 @@ func (p *stringValueParser) parse(ctx *parseContext, value string) error {
 	}
 	value = value[*p.indent:]
 	if ctx.parent[p.name] == nil {
-		// println("SET[", p.name, "]", value)
+		println("SET[", p.name, "]", value)
 		ctx.parent[p.name] = value
 	} else {
 		// println("APPEND[", p.name, "]", value)

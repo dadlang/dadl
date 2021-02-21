@@ -1,3 +1,4 @@
+@schema ../project.dads
 
 name Cart
 namespace cart
