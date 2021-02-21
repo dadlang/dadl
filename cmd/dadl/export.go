@@ -13,13 +13,15 @@ import (
 )
 
 var (
-	format string
+	format  string
+	outFile string
 
 	formatChoices = map[string]func(map[string]interface{}) string{"json": export.ToJSON, "yaml": export.ToYAML}
 )
 
 func init() {
 	exportCmd.Flags().StringVarP(&format, "format", "f", "json", "Format of the exported file {json|yaml}")
+	exportCmd.Flags().StringVarP(&outFile, "out", "o", "", "Save exported data to a file")
 	rootCmd.AddCommand(exportCmd)
 }
 
@@ -42,7 +44,6 @@ var exportCmd = &cobra.Command{
 }
 
 func exportHandler(filePath string) {
-
 	exporter, _ := formatChoices[format]
 
 	file, err := os.Open(filePath)
@@ -59,5 +60,22 @@ func exportHandler(filePath string) {
 		return
 	}
 
-	fmt.Print(exporter(tree))
+	if outFile != "" {
+		saveToFile(outFile, exporter(tree))
+	} else {
+		fmt.Print(exporter(tree))
+	}
+}
+
+func saveToFile(file string, data string) {
+	f, err := os.Create(outFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(data)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
