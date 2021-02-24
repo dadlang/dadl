@@ -1,6 +1,15 @@
 @schema dadl 0.1
 
+[types]
+coordinates formula <x int> ' ' <y int>
+
 [structure]
-simpleMap map[string]
+structMap map[string]
     textValue string
     intValue int
+
+stringMap map[string]string
+
+intMap map[string]int
+
+coordinatesMap map[string]coordinates

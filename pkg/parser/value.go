@@ -17,6 +17,7 @@ const (
 type valueType interface {
 	toRegex() string
 	parse(value string) (interface{}, error)
+	isSimple() bool
 }
 
 type stringValue struct {
@@ -34,6 +35,10 @@ func (v *stringValue) toRegex() string {
 	return ".*"
 }
 
+func (v *stringValue) isSimple() bool {
+	return true
+}
+
 type boolValue struct {
 }
 
@@ -43,6 +48,10 @@ func (v *boolValue) parse(value string) (interface{}, error) {
 
 func (v *boolValue) toRegex() string {
 	return "(?:true)|(?:false)"
+}
+
+func (v *boolValue) isSimple() bool {
+	return true
 }
 
 type constantValue struct {
@@ -55,6 +64,10 @@ func (v *constantValue) parse(value string) (interface{}, error) {
 
 func (v *constantValue) toRegex() string {
 	return regexp.QuoteMeta(v.value)
+}
+
+func (v *constantValue) isSimple() bool {
+	return true
 }
 
 type intValue struct {
@@ -70,6 +83,10 @@ func (v *intValue) toRegex() string {
 	return "(-)?\\d+"
 }
 
+func (v *intValue) isSimple() bool {
+	return true
+}
+
 type enumValue struct {
 	values map[string]bool
 }
@@ -80,6 +97,10 @@ func (v *enumValue) parse(value string) (interface{}, error) {
 
 func (v *enumValue) toRegex() string {
 	return "\\S+"
+}
+
+func (v *enumValue) isSimple() bool {
+	return true
 }
 
 type formulaItem struct {
@@ -137,6 +158,10 @@ func (v *formulaValue) toRegex() string {
 	return sb.String()
 }
 
+func (v *formulaValue) isSimple() bool {
+	return true
+}
+
 type sequenceValue struct {
 	itemType  valueType
 	separator string
@@ -168,6 +193,10 @@ func (v *sequenceValue) toRegex() string {
 	return "(?:" + v.itemType.toRegex() + ")(?:" + v.separator + "(?:" + v.itemType.toRegex() + "))*"
 }
 
+func (v *sequenceValue) isSimple() bool {
+	return true
+}
+
 type binaryValue struct {
 	textFormat binaryAsTextFormat
 }
@@ -178,4 +207,8 @@ func (v *binaryValue) parse(value string) (interface{}, error) {
 
 func (v *binaryValue) toRegex() string {
 	return ".*"
+}
+
+func (v *binaryValue) isSimple() bool {
+	return true
 }

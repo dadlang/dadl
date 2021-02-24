@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -14,6 +15,7 @@ import (
 var typeBaseRe = regexp.MustCompile("(?P<name>" + regexIdentifier + ")(\\s+(?P<baseType>" + regexIdentifier + "))?(?P<extra>.*)")
 var listTypeArgsRe = regexp.MustCompile("(?P<itemType>[a-zA-Z0-9-_]+)(\\s+as\\s+(?P<mappedType>[a-zA-Z0-9-_]+)(\\[(?P<mappedTypeArg1>[a-zA-Z0-9-_]+)\\](?P<mappedTypeArg2>[a-zA-Z0-9-_]+)?)?)?")
 var formulaTypeArgsRe = regexp.MustCompile("(?:\\<(?P<name>" + regexIdentifier + ")\\s+(?P<baseType>" + regexIdentifier + ")\\>)|(?:\\'(?P<literal>.*?)\\')")
+var mapTypeArgsRe = regexp.MustCompile("\\[(?P<keyType>" + regexIdentifier + ")\\](?P<valueType>" + regexIdentifier + ")?")
 
 //GetDadlSchema returns dadl schema
 func GetDadlSchema() DadlSchema {
@@ -103,6 +105,8 @@ func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
 		parseFormulaArgs(newCtx, strings.TrimSpace(extra), "formula")
 	} else if baseType == "sequence" {
 		parseSequenceArgs(newCtx, strings.TrimSpace(extra), "sequence")
+	} else if baseType == "map" {
+		parseMapTypeArgs(newCtx, strings.TrimSpace(extra), "map")
 	}
 	return nil
 }
@@ -185,6 +189,22 @@ func parseListTypeArgs(ctx *parseContext, value string, key string) error {
 	return nil
 }
 
+func parseMapTypeArgs(ctx *parseContext, value string, key string) error {
+	match := mapTypeArgsRe.FindStringSubmatch(strings.TrimSpace(value))
+	// var keyValue string
+	res := map[string]string{}
+	if match != nil {
+		for i, name := range mapTypeArgsRe.SubexpNames() {
+			if i != 0 && name != "" {
+				res[name] = match[i]
+			}
+		}
+	}
+	ctx.parent["keyType"] = res["keyType"]
+	ctx.parent["valueType"] = res["valueType"]
+	return nil
+}
+
 func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, error) {
 
 	if schemaName == "dadl" {
@@ -202,7 +222,7 @@ func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, err
 		return nil, err
 	}
 
-	//fmt.Printf("Parsed schema tree: %v\n", tree)
+	fmt.Printf("Parsed schema tree: %v\n", tree)
 
 	var typesDefs map[string]interface{}
 	if tree["types"] != nil {
@@ -216,7 +236,7 @@ func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, err
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Printf("Schema: %v\n", root)
+	fmt.Printf("Schema: %v\n", root)
 	return &dadlSchemaImpl{root: root}, nil
 }
 
@@ -235,11 +255,28 @@ func buildGenericNode(children map[string]interface{}, typeResolver *typeResolve
 			}
 			node.children[key] = child
 		} else if baseType == "map" {
-			child, err := buildMapNode(value["value"].(map[string]interface{}), typeResolver)
+			keyType, err := typeResolver.resolveType(value["keyType"].(string))
 			if err != nil {
 				return nil, err
 			}
-			node.children[key] = child
+			var valueType valueType
+			if value["valueType"] != "" {
+				valueType, err = typeResolver.resolveType(value["valueType"].(string))
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			if valueType != nil && valueType.isSimple() {
+				child := simpleMapNode{key: keyType, value: valueType}
+				node.children[key] = &child
+			} else {
+				child, err := buildMapNode(value["value"].(map[string]interface{}), typeResolver)
+				if err != nil {
+					return nil, err
+				}
+				node.children[key] = child
+			}
 		} else if baseType == "list" {
 			child, err := buildListNode(value["value"].(map[string]interface{}), typeResolver)
 			if err != nil {

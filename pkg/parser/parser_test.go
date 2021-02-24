@@ -122,7 +122,7 @@ job Developer`,
 		name:     "maps test",
 		testFile: "maps/maps.dad",
 		expected: Node{
-			"simpleMap": Node{
+			"structMap": Node{
 				"firstKey": Node{
 					"intValue":  7,
 					"textValue": "some text value",
@@ -139,6 +139,24 @@ job Developer`,
 				"fifthKey": Node{
 					"textValue": "fifth",
 				},
+			},
+			"coordinatesMap": Node{
+				"key1": Node{
+					"x": 2,
+					"y": 3,
+				},
+				"key2": Node{
+					"x": 5,
+					"y": 7,
+				},
+			},
+			"intMap": Node{
+				"key1": 5,
+				"key2": 7,
+			},
+			"stringMap": Node{
+				"key1": "value1",
+				"key2": "value2",
 			},
 		},
 	},

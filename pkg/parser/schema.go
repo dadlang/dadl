@@ -94,6 +94,23 @@ func (n *genericMapNode) isSimple() bool {
 	return false
 }
 
+type simpleMapNode struct {
+	key   valueType
+	value valueType
+}
+
+func (n *simpleMapNode) childNode(name string) (SchemaNode, error) {
+	return &simpleValueLeafNode{name: name, valueType: n.value}, nil
+}
+
+func (n *simpleMapNode) childParser() (NodeParser, error) {
+	return &keyWithDelegatedValueParser{}, nil
+}
+
+func (n *simpleMapNode) isSimple() bool {
+	return false
+}
+
 type keyWithDelegatedValueParser struct{}
 
 func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) error {

@@ -1,6 +1,6 @@
 @schema ./maps.dads
 
-simpleMap
+structMap
     firstKey
         textValue some text value
         intValue 7
@@ -9,9 +9,21 @@ simpleMap
     thirdKey
         textValue third
         
-[simpleMap.fourthKey]
+[structMap.fourthKey]
 textValue fourth
 
-[simpleMap]
+[structMap]
 fifthKey
     textValue fifth
+
+[stringMap]
+key1 value1
+key2 value2
+
+[intMap]
+key1 5
+key2 7
+
+[coordinatesMap]
+key1 2 3
+key2 5 7

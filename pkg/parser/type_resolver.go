@@ -14,7 +14,10 @@ func newResolver(typesDefs map[string]interface{}) *typeResolver {
 func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, error) {
 	switch typeDef["baseType"] {
 	case "string":
-		return &stringValue{regex: typeDef["regex"].(string)}, nil
+		if typeDef["regex"] != nil {
+			return &stringValue{regex: typeDef["regex"].(string)}, nil
+		}
+		return &stringValue{}, nil
 	case "int":
 		return &intValue{}, nil
 	case "bool":
@@ -58,6 +61,16 @@ func (r *typeResolver) resolveType(typeName string) (valueType, error) {
 		return resolved, nil
 	}
 	var err error
+
+	//TODO
+	switch typeName {
+	case "string":
+		return &stringValue{}, nil
+	case "int":
+		return &intValue{}, nil
+	case "bool":
+		return &boolValue{}, nil
+	}
 
 	typeDef := r.typesDefs[typeName]
 	if typeDef == nil {
