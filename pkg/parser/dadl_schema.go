@@ -278,18 +278,25 @@ func buildGenericNode(children map[string]interface{}, typeResolver *typeResolve
 				node.children[key] = child
 			}
 		} else if baseType == "list" {
-			child, err := buildListNode(value["value"].(map[string]interface{}), typeResolver)
+			itemType, err := typeResolver.resolveType(value["itemType"].(string))
 			if err != nil {
 				return nil, err
 			}
-			node.children[key] = child
+			node.children[key] = &childListOnlyNode{childType: &simpleValueLeafNode{name: "", valueType: itemType}}
 		} else {
 			valueType, err := typeResolver.buildType(value)
 			if err != nil {
 				return nil, err
 			}
 			_, isString := valueType.(*stringValue)
-			if isString {
+			asStruct, isStruct := valueType.(*structValue)
+			if isStruct {
+				child, err := buildGenericNode(asStruct.children, typeResolver)
+				if err != nil {
+					return nil, err
+				}
+				node.children[key] = child
+			} else if isString {
 				node.children[key] = &stringValueNode{name: key}
 			} else {
 				node.children[key] = &simpleValueLeafNode{name: key, valueType: valueType}

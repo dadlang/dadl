@@ -23,17 +23,21 @@ var printCmd = &cobra.Command{
 	Short: "Prints data from given file",
 	Long:  `Prints data from given file.`,
 	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return errors.New("requires a file name")
+		if len(args) < 1 {
+			return errors.New("requires optional path and a file name")
 		}
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		printHandler(args[0])
+		if len(args) == 1 {
+			printHandler(args[0], ".")
+		} else {
+			printHandler(args[1], args[0])
+		}
 	},
 }
 
-func printHandler(filePath string) {
+func printHandler(filePath string, treePath string) {
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -49,11 +53,24 @@ func printHandler(filePath string) {
 		return
 	}
 
-	printTree(tree)
+	tree, _ = filterTree(tree, treePath)
+	printTree(tree, treePath)
 }
 
-func printTree(root map[string]interface{}) {
-	tree := treeprint.New()
+func filterTree(root map[string]interface{}, filterPath string) (map[string]interface{}, error) {
+	if filterPath == "." {
+		return root, nil
+	}
+	node := root
+	pathElements := strings.Split(filterPath, ".")
+	for _, pathElement := range pathElements {
+		node = node[pathElement].(map[string]interface{})
+	}
+	return node, nil
+}
+
+func printTree(root map[string]interface{}, rootName string) {
+	tree := treeprint.NewWithRoot(rootName)
 	buildMapChildren(tree, root)
 	fmt.Println(tree.String())
 }

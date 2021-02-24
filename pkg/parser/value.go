@@ -1,11 +1,23 @@
 package parser
 
 import (
+	"errors"
 	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+type valueBuilder interface {
+	getValue() interface{}
+	setValue(value interface{})
+}
+
+type valueType interface {
+	toRegex() string
+	parse(value string) (interface{}, error)
+	isSimple() bool
+}
 
 type binaryAsTextFormat int
 
@@ -13,12 +25,6 @@ const (
 	binaryFormatBase64 binaryAsTextFormat = iota
 	binaryFormatHex
 )
-
-type valueType interface {
-	toRegex() string
-	parse(value string) (interface{}, error)
-	isSimple() bool
-}
 
 type stringValue struct {
 	regex string
@@ -84,6 +90,23 @@ func (v *intValue) toRegex() string {
 }
 
 func (v *intValue) isSimple() bool {
+	return true
+}
+
+type numberValue struct {
+	min big.Float
+	max big.Float
+}
+
+func (v *numberValue) parse(value string) (interface{}, error) {
+	return value, nil
+}
+
+func (v *numberValue) toRegex() string {
+	return "-?(?:\\d+)|(?:\\d*\\.\\d+)"
+}
+
+func (v *numberValue) isSimple() bool {
 	return true
 }
 
@@ -211,4 +234,20 @@ func (v *binaryValue) toRegex() string {
 
 func (v *binaryValue) isSimple() bool {
 	return true
+}
+
+type structValue struct {
+	children map[string]interface{}
+}
+
+func (v *structValue) parse(value string) (interface{}, error) {
+	return nil, errors.New("Not supported")
+}
+
+func (v *structValue) toRegex() string {
+	return ".*"
+}
+
+func (v *structValue) isSimple() bool {
+	return false
 }

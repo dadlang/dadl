@@ -146,7 +146,10 @@ func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) err
 		if err != nil {
 			return nil
 		}
-		childParser.parse(ctx, res["rest"])
+		err = childParser.parse(ctx, res["rest"])
+		if err != nil {
+			return err
+		}
 	}
 	// else {
 	// 	ctx.last = ctx.parent

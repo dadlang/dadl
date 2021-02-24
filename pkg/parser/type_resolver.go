@@ -20,6 +20,8 @@ func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, err
 		return &stringValue{}, nil
 	case "int":
 		return &intValue{}, nil
+	case "number":
+		return &numberValue{}, nil
 	case "bool":
 		return &boolValue{}, nil
 	case "enum":
@@ -51,6 +53,8 @@ func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, err
 		return &sequenceValue{itemType: itemType}, nil
 	case "binary":
 		return &binaryValue{}, nil
+	case "struct":
+		return &structValue{children: typeDef["children"].(map[string]interface{})}, nil
 	}
 
 	return r.resolveType(typeDef["baseType"].(string))
@@ -68,6 +72,8 @@ func (r *typeResolver) resolveType(typeName string) (valueType, error) {
 		return &stringValue{}, nil
 	case "int":
 		return &intValue{}, nil
+	case "number":
+		return &numberValue{}, nil
 	case "bool":
 		return &boolValue{}, nil
 	}
