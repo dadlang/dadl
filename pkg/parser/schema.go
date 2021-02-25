@@ -3,7 +3,6 @@ package parser
 import (
 	"errors"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -23,6 +22,11 @@ var (
 type DadlSchema interface {
 	getRoot() SchemaNode
 	getNode(path string) (SchemaNode, error)
+}
+
+type DadlSchema2 interface {
+	getRoot() valueType
+	getNode(path string, builder valueBuilder) (valueType, valueBuilder, error)
 }
 
 //SchemaNode defines schema node
@@ -51,6 +55,27 @@ func (s *dadlSchemaImpl) getNode(nodePath string) (SchemaNode, error) {
 		}
 	}
 	return node, nil
+}
+
+type dadlSchemaImpl2 struct {
+	root valueType
+}
+
+func (s *dadlSchemaImpl2) getRoot() valueType {
+	return s.root
+}
+
+func (s *dadlSchemaImpl2) getNode(nodePath string, builder valueBuilder) (valueType, valueBuilder, error) {
+	node := s.root
+	var err error
+	pathElements := strings.Split(nodePath, ".")
+	for _, pathElement := range pathElements {
+		node, builder, err = node.getChild(pathElement, builder)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return node, builder, nil
 }
 
 type genericSchemaNode struct {
@@ -94,22 +119,22 @@ func (n *genericMapNode) isSimple() bool {
 	return false
 }
 
-type simpleMapNode struct {
-	key   valueType
-	value valueType
-}
+// type simpleMapNode struct {
+// 	key   valueType
+// 	value valueType
+// }
 
-func (n *simpleMapNode) childNode(name string) (SchemaNode, error) {
-	return &simpleValueLeafNode{name: name, valueType: n.value}, nil
-}
+// func (n *simpleMapNode) childNode(name string) (SchemaNode, error) {
+// 	return &simpleValueLeafNode{name: name, valueType: n.value}, nil
+// }
 
-func (n *simpleMapNode) childParser() (NodeParser, error) {
-	return &keyWithDelegatedValueParser{}, nil
-}
+// func (n *simpleMapNode) childParser() (NodeParser, error) {
+// 	return &keyWithDelegatedValueParser{}, nil
+// }
 
-func (n *simpleMapNode) isSimple() bool {
-	return false
-}
+// func (n *simpleMapNode) isSimple() bool {
+// 	return false
+// }
 
 type keyWithDelegatedValueParser struct{}
 
@@ -157,172 +182,172 @@ func (p *keyWithDelegatedValueParser) parse(ctx *parseContext, value string) err
 	return nil
 }
 
-type stringValueParser struct {
-	name   string
-	indent *int
-}
+// type stringValueParser struct {
+// 	name   string
+// 	indent *int
+// }
 
-func (p *stringValueParser) parse(ctx *parseContext, value string) error {
-	//println("[stringValueParser.parse]", value)
-	if *p.indent == 0 {
-		*p.indent = calcIndentWeight(value)
-	}
-	value = value[*p.indent:]
-	if ctx.parent[p.name] == nil {
-		//println("SET[", p.name, "]", value)
-		ctx.parent[p.name] = value
-	} else {
-		// println("APPEND[", p.name, "]", value)
-		ctx.parent[p.name] = ctx.parent[p.name].(string) + "\n" + value
-	}
-	ctx.last = ctx.parent
-	ctx.lastSchema = ctx.parentSchema
-	return nil
-}
+// func (p *stringValueParser) parse(ctx *parseContext, value string) error {
+// 	//println("[stringValueParser.parse]", value)
+// 	if *p.indent == 0 {
+// 		*p.indent = calcIndentWeight(value)
+// 	}
+// 	value = value[*p.indent:]
+// 	if ctx.parent[p.name] == nil {
+// 		//println("SET[", p.name, "]", value)
+// 		ctx.parent[p.name] = value
+// 	} else {
+// 		// println("APPEND[", p.name, "]", value)
+// 		ctx.parent[p.name] = ctx.parent[p.name].(string) + "\n" + value
+// 	}
+// 	ctx.last = ctx.parent
+// 	ctx.lastSchema = ctx.parentSchema
+// 	return nil
+// }
 
-type intValueParser struct {
-	name string
-}
+// type intValueParser struct {
+// 	name string
+// }
 
-func (p *intValueParser) parse(ctx *parseContext, value string) error {
-	//println("[intValueParser.parse]", value)
-	var err error
-	ctx.parent[p.name], err = strconv.Atoi(value)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// func (p *intValueParser) parse(ctx *parseContext, value string) error {
+// 	//println("[intValueParser.parse]", value)
+// 	var err error
+// 	ctx.parent[p.name], err = strconv.Atoi(value)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
-type genericKeyValueParser struct {
-	node SchemaNode
-}
+// type genericKeyValueParser struct {
+// 	node SchemaNode
+// }
 
-func (p *genericKeyValueParser) parse(ctx *parseContext, value string) error {
-	// println("[genericKeyValueParser.parse]", value)
-	value = strings.TrimSpace(value)
-	vals := strings.SplitN(value, " ", 2)
-	if len(vals) > 1 {
-		ctx.parent[vals[0]] = vals[1]
-	} else {
-		//	println("ERRRRRRRRRRRRR")
-	}
-	return nil
-}
+// func (p *genericKeyValueParser) parse(ctx *parseContext, value string) error {
+// 	// println("[genericKeyValueParser.parse]", value)
+// 	value = strings.TrimSpace(value)
+// 	vals := strings.SplitN(value, " ", 2)
+// 	if len(vals) > 1 {
+// 		ctx.parent[vals[0]] = vals[1]
+// 	} else {
+// 		//	println("ERRRRRRRRRRRRR")
+// 	}
+// 	return nil
+// }
 
-func (p *genericKeyValueParser) isSimple() bool {
-	return false
-}
+// func (p *genericKeyValueParser) isSimple() bool {
+// 	return false
+// }
 
-type childListOnlyNode struct {
-	childType SchemaNode
-}
+// type childListOnlyNode struct {
+// 	childType SchemaNode
+// }
 
-func (n *childListOnlyNode) valueType() valueType {
-	return nil
-}
+// func (n *childListOnlyNode) valueType() valueType {
+// 	return nil
+// }
 
-func (n *childListOnlyNode) childNode(name string) (SchemaNode, error) {
-	return n.childType, nil
-}
+// func (n *childListOnlyNode) childNode(name string) (SchemaNode, error) {
+// 	return n.childType, nil
+// }
 
-func (n *childListOnlyNode) childParser() (NodeParser, error) {
-	return n.childType.childParser()
-}
+// func (n *childListOnlyNode) childParser() (NodeParser, error) {
+// 	return n.childType.childParser()
+// }
 
-func (n *childListOnlyNode) isSimple() bool {
-	return false
-}
+// func (n *childListOnlyNode) isSimple() bool {
+// 	return false
+// }
 
-type identifierListNode struct {
-	childType SchemaNode
-}
+// type identifierListNode struct {
+// 	childType SchemaNode
+// }
 
-func (n *identifierListNode) valueType() valueType {
-	return nil
-}
+// func (n *identifierListNode) valueType() valueType {
+// 	return nil
+// }
 
-func (n *identifierListNode) childNode(name string) (SchemaNode, error) {
-	return n.childType, nil
-}
+// func (n *identifierListNode) childNode(name string) (SchemaNode, error) {
+// 	return n.childType, nil
+// }
 
-func (n *identifierListNode) childParser() (NodeParser, error) {
-	return &genericKeyParser{childType: n.childType}, nil
-}
+// func (n *identifierListNode) childParser() (NodeParser, error) {
+// 	return &genericKeyParser{childType: n.childType}, nil
+// }
 
-func (n *identifierListNode) isSimple() bool {
-	return false
-}
+// func (n *identifierListNode) isSimple() bool {
+// 	return false
+// }
 
-type genericKeyParser struct {
-	childType SchemaNode
-}
+// type genericKeyParser struct {
+// 	childType SchemaNode
+// }
 
-func (p *genericKeyParser) parse(ctx *parseContext, value string) error {
-	//	println("[genericKeyParser.parse]", value)
-	key := strings.TrimSpace(value)
-	v := Node{}
-	ctx.parent[key] = v
-	ctx.last = v
-	ctx.lastSchema = p.childType
-	return nil
-}
+// func (p *genericKeyParser) parse(ctx *parseContext, value string) error {
+// 	//	println("[genericKeyParser.parse]", value)
+// 	key := strings.TrimSpace(value)
+// 	v := Node{}
+// 	ctx.parent[key] = v
+// 	ctx.last = v
+// 	ctx.lastSchema = p.childType
+// 	return nil
+// }
 
 //ParseSchema parses schema
-func ParseSchema() (DadlSchema, error) {
-	return &dadlSchemaImpl{root: &genericSchemaNode{
-		children: map[string]SchemaNode{
-			"name":     &stringValueNode{name: "name"},
-			"codename": &stringValueNode{name: "codename"},
-			"global": &genericSchemaNode{
-				children: map[string]SchemaNode{
-					"types": &childListOnlyNode{
-						childType: &customTokensNode{
-							keyTokenName: "name",
-							tokens: []TokenSpec{
-								regexToken{name: "name", regex: "[a-zA-Z0-9-_]+"},
-								regexToken{regex: "\\s+", optional: false},
-								regexToken{name: "baseType", regex: "[a-zA-Z0-9-_]+"},
-							},
-						},
-					},
-				},
-			},
-			"modules": &childListOnlyNode{
-				childType: &genericSchemaNode{
-					children: map[string]SchemaNode{
-						"name":      &stringValueNode{name: "name"},
-						"namespace": &stringValueNode{name: "namespace"},
-						"types": &childListOnlyNode{
-							childType: &customTokensNode{
-								keyTokenName: "name",
-								tokens: []TokenSpec{
-									regexToken{name: "name", regex: "[a-zA-Z0-9-_]+"},
-									regexToken{regex: "\\s+", optional: false},
-									regexToken{name: "baseType", regex: "[a-zA-Z0-9-_]+"},
-								},
-							},
-						},
-					},
-				},
-			},
-			"contexts": &identifierListNode{
-				childType: &customTokensNode{
-					keyTokenName: "name",
-					tokens: []TokenSpec{
-						regexToken{name: "name", regex: "[a-zA-Z0-9-_]+"},
-						regexToken{name: "optional", regex: "[?]", optional: true, transformer: func(val string) interface{} { return val != "" }},
-						regexToken{regex: "\\s+"},
-						regexToken{name: "type", regex: "[a-zA-Z0-9-_]+"},
-						regexToken{regex: "\\s+"},
-						regexToken{name: "desc", regex: "#.+", transformer: func(val string) interface{} { return val[1:] }},
-					},
-				},
-			},
-			//,
-		},
-	}}, nil
-}
+// func ParseSchema() (DadlSchema, error) {
+// 	return &dadlSchemaImpl{root: &genericSchemaNode{
+// 		children: map[string]SchemaNode{
+// 			"name":     &stringValueNode{name: "name"},
+// 			"codename": &stringValueNode{name: "codename"},
+// 			"global": &genericSchemaNode{
+// 				children: map[string]SchemaNode{
+// 					"types": &childListOnlyNode{
+// 						childType: &customTokensNode{
+// 							keyTokenName: "name",
+// 							tokens: []TokenSpec{
+// 								regexToken{name: "name", regex: "[a-zA-Z0-9-_]+"},
+// 								regexToken{regex: "\\s+", optional: false},
+// 								regexToken{name: "baseType", regex: "[a-zA-Z0-9-_]+"},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			"modules": &childListOnlyNode{
+// 				childType: &genericSchemaNode{
+// 					children: map[string]SchemaNode{
+// 						"name":      &stringValueNode{name: "name"},
+// 						"namespace": &stringValueNode{name: "namespace"},
+// 						"types": &childListOnlyNode{
+// 							childType: &customTokensNode{
+// 								keyTokenName: "name",
+// 								tokens: []TokenSpec{
+// 									regexToken{name: "name", regex: "[a-zA-Z0-9-_]+"},
+// 									regexToken{regex: "\\s+", optional: false},
+// 									regexToken{name: "baseType", regex: "[a-zA-Z0-9-_]+"},
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			"contexts": &identifierListNode{
+// 				childType: &customTokensNode{
+// 					keyTokenName: "name",
+// 					tokens: []TokenSpec{
+// 						regexToken{name: "name", regex: "[a-zA-Z0-9-_]+"},
+// 						regexToken{name: "optional", regex: "[?]", optional: true, transformer: func(val string) interface{} { return val != "" }},
+// 						regexToken{regex: "\\s+"},
+// 						regexToken{name: "type", regex: "[a-zA-Z0-9-_]+"},
+// 						regexToken{regex: "\\s+"},
+// 						regexToken{name: "desc", regex: "#.+", transformer: func(val string) interface{} { return val[1:] }},
+// 					},
+// 				},
+// 			},
+// 			//,
+// 		},
+// 	}}, nil
+// }
 
 // name Online Boutique
 // codename boutique

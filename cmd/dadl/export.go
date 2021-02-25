@@ -53,7 +53,7 @@ func exportHandler(filePath string) {
 	defer file.Close()
 
 	p := parser.NewParser()
-	tree, err := p.Parse(file, parser.NewFSResourceProvider(filepath.Dir(filePath)))
+	tree, err := p.Parse2(file, parser.NewFSResourceProvider(filepath.Dir(filePath)))
 
 	if err != nil {
 		println("Err: ", err.Error())

@@ -79,7 +79,9 @@ func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
 		ctx.last = structure
 	} else if baseType == "map" {
 		structure := Node{}
-		result["value"] = structure
+		valueType := Node{}
+		valueType["children"] = structure
+		result["valueType"] = valueType
 		ctx.last = structure
 	} else {
 		ctx.last = result
@@ -178,7 +180,7 @@ func parseListTypeArgs(ctx *parseContext, value string, key string) error {
 			}
 		}
 	}
-	ctx.parent["itemType"] = res["itemType"]
+	ctx.parent["itemType"] = Node{"baseType": res["itemType"]}
 	if res["mappedType"] != "" {
 		mapped := map[string]string{}
 		mapped["mappedType"] = res["mappedType"]
@@ -200,8 +202,12 @@ func parseMapTypeArgs(ctx *parseContext, value string, key string) error {
 			}
 		}
 	}
-	ctx.parent["keyType"] = res["keyType"]
-	ctx.parent["valueType"] = res["valueType"]
+	ctx.parent["keyType"] = Node{"baseType": res["keyType"]}
+	valueType := res["valueType"]
+	if valueType == "" {
+		valueType = "struct"
+	}
+	ctx.parent["valueType"].(Node)["baseType"] = valueType
 	return nil
 }
 
@@ -233,11 +239,47 @@ func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, err
 	resolver := newResolver(typesDefs)
 
 	root, err := buildGenericNode(tree["structure"].(map[string]interface{}), resolver)
+
 	if err != nil {
 		return nil, err
 	}
 	fmt.Printf("Schema: %v\n", root)
 	return &dadlSchemaImpl{root: root}, nil
+}
+
+func parseSchema2(schemaName string, resources ResourceProvider) (DadlSchema2, error) {
+
+	p := NewParser()
+	file, err := resources.GetResource(schemaName)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := p.Parse(file, resources)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("Parsed schema tree: %v\n", tree)
+
+	var typesDefs map[string]interface{}
+	if tree["types"] != nil {
+		typesDefs = tree["types"].(map[string]interface{})
+	} else {
+		typesDefs = map[string]interface{}{}
+	}
+	resolver := newResolver(typesDefs)
+
+	root, err := resolver.buildType(map[string]interface{}{
+		"baseType": "struct",
+		"children": tree["structure"],
+	})
+	// root, err := buildGenericNode(tree["structure"].(map[string]interface{}), resolver)
+
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("Schema: %+v\n", root)
+	return &dadlSchemaImpl2{root: root}, nil
 }
 
 func buildGenericNode(children map[string]interface{}, typeResolver *typeResolver) (SchemaNode, error) {
@@ -254,53 +296,55 @@ func buildGenericNode(children map[string]interface{}, typeResolver *typeResolve
 				return nil, err
 			}
 			node.children[key] = child
-		} else if baseType == "map" {
-			keyType, err := typeResolver.resolveType(value["keyType"].(string))
-			if err != nil {
-				return nil, err
-			}
-			var valueType valueType
-			if value["valueType"] != "" {
-				valueType, err = typeResolver.resolveType(value["valueType"].(string))
-				if err != nil {
-					return nil, err
-				}
-			}
+			// }
+			// else if baseType == "map" {
+			// 	keyType, err := typeResolver.resolveType(value["keyType"].(string))
+			// 	if err != nil {
+			// 		return nil, err
+			// 	}
+			// 	var valueType valueType
+			// 	if value["valueType"] != "" {
+			// 		valueType, err = typeResolver.resolveType(value["valueType"].(string))
+			// 		if err != nil {
+			// 			return nil, err
+			// 		}
+			// 	}
 
-			if valueType != nil && valueType.isSimple() {
-				child := simpleMapNode{key: keyType, value: valueType}
-				node.children[key] = &child
-			} else {
-				child, err := buildMapNode(value["value"].(map[string]interface{}), typeResolver)
-				if err != nil {
-					return nil, err
-				}
-				node.children[key] = child
-			}
-		} else if baseType == "list" {
-			itemType, err := typeResolver.resolveType(value["itemType"].(string))
-			if err != nil {
-				return nil, err
-			}
-			node.children[key] = &childListOnlyNode{childType: &simpleValueLeafNode{name: "", valueType: itemType}}
+			// 	if valueType != nil && valueType.isSimple() {
+			// 		child := simpleMapNode{key: keyType, value: valueType}
+			// 		node.children[key] = &child
+			// 	} else {
+			// 		child, err := buildMapNode(value["value"].(map[string]interface{}), typeResolver)
+			// 		if err != nil {
+			// 			return nil, err
+			// 		}
+			// 		node.children[key] = child
+			// 	}
+			// } else if baseType == "list" {
+			// 	itemType, err := typeResolver.resolveType(value["itemType"].(string))
+			// 	if err != nil {
+			// 		return nil, err
+			// 	}
+			// 	node.children[key] = &childListOnlyNode{childType: &simpleValueLeafNode{name: "", valueType: itemType}}
 		} else {
-			valueType, err := typeResolver.buildType(value)
-			if err != nil {
-				return nil, err
-			}
-			_, isString := valueType.(*stringValue)
-			asStruct, isStruct := valueType.(*structValue)
-			if isStruct {
-				child, err := buildGenericNode(asStruct.children, typeResolver)
-				if err != nil {
-					return nil, err
-				}
-				node.children[key] = child
-			} else if isString {
-				node.children[key] = &stringValueNode{name: key}
-			} else {
-				node.children[key] = &simpleValueLeafNode{name: key, valueType: valueType}
-			}
+			// valueType, err := typeResolver.buildType(value)
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// _, isString := valueType.(*stringValue)
+			// asStruct, isStruct := valueType.(*structValue)
+			// if isStruct {
+			// 	child, err := buildGenericNode(asStruct.children, typeResolver)
+			// 	if err != nil {
+			// 		return nil, err
+			// 	}
+			// 	node.children[key] = child
+			// }
+			// else if isString {
+			// 	node.children[key] = &stringValueNode{name: key}
+			// } else {
+			// 	node.children[key] = &simpleValueLeafNode{name: key, valueType: valueType}
+			// }
 		}
 	}
 	return node, nil

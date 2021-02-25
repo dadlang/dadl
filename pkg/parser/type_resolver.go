@@ -53,8 +53,34 @@ func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, err
 		return &sequenceValue{itemType: itemType}, nil
 	case "binary":
 		return &binaryValue{}, nil
+	case "list":
+		valueType, err := r.buildType(typeDef["itemType"].(map[string]interface{}))
+		if err != nil {
+			return nil, err
+		}
+		return &listValue{childType: valueType}, nil
+	case "map":
+		keyType, err := r.buildType(typeDef["keyType"].(map[string]interface{}))
+		if err != nil {
+			return nil, err
+		}
+		valueType, err := r.buildType(typeDef["valueType"].(map[string]interface{}))
+		if err != nil {
+			return nil, err
+		}
+		return &mapValue{keyType: keyType, valueType: valueType}, nil
 	case "struct":
-		return &structValue{children: typeDef["children"].(map[string]interface{})}, nil
+		var err error
+		children := map[string]valueType{}
+		childerenDef := typeDef["children"].(map[string]interface{})
+		for key, def := range childerenDef {
+			children[key], err = r.buildType(def.(map[string]interface{}))
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return &structValue{children: children}, nil
 	}
 
 	return r.resolveType(typeDef["baseType"].(string))

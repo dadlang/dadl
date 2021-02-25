@@ -9,3 +9,4 @@ secondModule
     active false
 
 [modules.thirdModule << ./module.dad]
+active false

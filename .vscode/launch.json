@@ -27,6 +27,15 @@
             "cwd": "/Users/krzysiek/Projects/visuo/dadl"
         },
         {
+            "name": "Launch teleport",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
+            "args": ["export", "./samples/teleport/teleport.dad", "-f", "json"],
+            "cwd": "/Users/krzysiek/Projects/visuo/dadl"
+        },
+        {
             "name": "Launch import text file",
             "type": "go",
             "request": "launch",
@@ -54,12 +63,12 @@
             "cwd": "/Users/krzysiek/Projects/visuo/dadl"
         },
         {
-            "name": "Launch subtree module file",
+            "name": "Launch import subtree file",
             "type": "go",
             "request": "launch",
             "mode": "debug",
             "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
-            "args": ["export", "./samples/import_subtree/module.dad", "-f", "json"],
+            "args": ["export", "./samples/import_subtree/import_subtree.dad", "-f", "json"],
             "cwd": "/Users/krzysiek/Projects/visuo/dadl"
         },
         {
@@ -69,6 +78,15 @@
             "mode": "debug",
             "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
             "args": ["export", "./samples/project/project.dad", "-f", "json"],
+            "cwd": "/Users/krzysiek/Projects/visuo/dadl"
+        },
+        {
+            "name": "Launch custom types 2 file",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "/Users/krzysiek/Projects/visuo/dadl/cmd/dadl/.",
+            "args": ["print", "./samples/custom_types2/custom_types.dad"],
             "cwd": "/Users/krzysiek/Projects/visuo/dadl"
         },
         {

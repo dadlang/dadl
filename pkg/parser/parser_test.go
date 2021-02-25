@@ -11,6 +11,7 @@ import (
 func TestParserE2E(t *testing.T) {
 	parser := NewParser()
 	for _, tc := range testCases {
+		println("Test:", tc.name)
 		fullPath := "../../samples/" + tc.testFile
 		file, err := os.Open(fullPath)
 		if err != nil {
@@ -18,9 +19,9 @@ func TestParserE2E(t *testing.T) {
 		}
 		defer file.Close()
 
-		got, err := parser.Parse(file, NewFSResourceProvider(filepath.Dir(fullPath)))
+		got, err := parser.Parse2(file, NewFSResourceProvider(filepath.Dir(fullPath)))
 		if err != nil {
-			t.Fatalf("could not parse %v", tc.testFile)
+			t.Fatalf("could not parse %v, %v", tc.testFile, err)
 		}
 		if !reflect.DeepEqual(got, tc.expected) {
 			t.Errorf("%s[%s]\nGOT:  %+v \nWANT: %+v", tc.name, tc.testFile, got, tc.expected)
@@ -66,6 +67,8 @@ job Developer`,
 			"someBrainfuck": `++++++++++[>+>+++>+++++++>+++++
 +++++<<<<-]>>>++.>+.+++++++..++
 +.<<++.>----.---.+++.++++++++.`,
+			"someBash": `#!/bin/bash
+echo "Hello Dadl!"`,
 		},
 	},
 	{
@@ -174,7 +177,7 @@ job Developer`,
 					"name":   "Second module",
 				},
 				"thirdModule": Node{
-					"active": true,
+					"active": false,
 					"name":   "Third module",
 				},
 			},

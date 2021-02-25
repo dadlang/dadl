@@ -1,0 +1,19 @@
+@schema custom_types.dads
+
+sampleAddressesList
+	node1:9042 
+	node2:9042 
+	node3:9042
+
+value
+	some
+	multiline
+	string
+	value
+
+parent
+	child1 text1
+	child2
+		subchild1 text2
+
+sampleAddress 127.0.0.1:8080

@@ -1,0 +1,15 @@
+@schema dadl 0.1
+
+[types]
+hostname string [A-Za-z0-9-_.]+
+networkPort int 0..65535 #Network port number
+address formula <host hostname> ':' <port networkPort>
+
+[structure]
+sampleAddress address
+sampleAddressesList list address
+value string
+parent
+    child1 hostname
+    child2 
+        subchild1 hostname
