@@ -34,7 +34,7 @@ func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, err
 		items := []formulaItem{}
 		for _, item := range typeDef["formula"].([]map[string]interface{}) {
 			if item["type"] == "token" {
-				itemType, err := r.resolveType(item["baseType"].(string))
+				itemType, err := r.buildType(item)
 				if err != nil {
 					return nil, err
 				}
@@ -79,10 +79,8 @@ func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, err
 				return nil, err
 			}
 		}
-
 		return &structValue{children: children}, nil
 	}
-
 	return r.resolveType(typeDef["baseType"].(string))
 }
 
@@ -91,19 +89,6 @@ func (r *typeResolver) resolveType(typeName string) (valueType, error) {
 		return resolved, nil
 	}
 	var err error
-
-	//TODO
-	switch typeName {
-	case "string":
-		return &stringValue{}, nil
-	case "int":
-		return &intValue{}, nil
-	case "number":
-		return &numberValue{}, nil
-	case "bool":
-		return &boolValue{}, nil
-	}
-
 	typeDef := r.typesDefs[typeName]
 	if typeDef == nil {
 		return nil, errors.New("Unknown type, no definition for: " + typeName)

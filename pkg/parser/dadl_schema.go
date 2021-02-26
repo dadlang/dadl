@@ -1,58 +1,38 @@
 package parser
 
 import (
-	"fmt"
+	"errors"
 	"regexp"
 	"strings"
 )
-
-// typeDefs list typeDef as map[name]type
-
-// [types]
-// operation enum GET POST PUT PATCH DELETE
-// typeDef sequence <name identifier> <SPACE> <type identifier> (<SPACE> '#' <desc string>)?
 
 var typeBaseRe = regexp.MustCompile("(?P<name>" + regexIdentifier + ")(\\s+(?P<baseType>" + regexIdentifier + "))?(?P<extra>.*)")
 var listTypeArgsRe = regexp.MustCompile("(?P<itemType>[a-zA-Z0-9-_]+)(\\s+as\\s+(?P<mappedType>[a-zA-Z0-9-_]+)(\\[(?P<mappedTypeArg1>[a-zA-Z0-9-_]+)\\](?P<mappedTypeArg2>[a-zA-Z0-9-_]+)?)?)?")
 var formulaTypeArgsRe = regexp.MustCompile("(?:\\<(?P<name>" + regexIdentifier + ")\\s+(?P<baseType>" + regexIdentifier + ")\\>)|(?:\\'(?P<literal>.*?)\\')")
 var mapTypeArgsRe = regexp.MustCompile("\\[(?P<keyType>" + regexIdentifier + ")\\](?P<valueType>" + regexIdentifier + ")?")
 
-//GetDadlSchema returns dadl schema
 func GetDadlSchema() DadlSchema {
-	return &dadlSchemaImpl{root: &genericSchemaNode{
-		children: map[string]SchemaNode{
-			"types":     &dadlSchemaTypeNode{},
-			"structure": &dadlStructureSchemaNode{},
+	return &dadlSchemaImpl{root: &structValue{
+		children: map[string]valueType{
+			"types":     &dadlCustomTypeValue{},
+			"structure": &dadlCustomTypeValue{},
 		},
 	}}
 }
 
-type dadlSchemaTypeNode struct {
+type dadlCustomTypeValue struct {
 }
 
-func (n *dadlSchemaTypeNode) valueType() valueType {
+func (v *dadlCustomTypeValue) parse(builder valueBuilder, value string) error {
+	// println("dadlCustomTypeValue [parse]:", value)
+	builder.setValue(Node{})
 	return nil
 }
 
-func (n *dadlSchemaTypeNode) childNode(name string) (SchemaNode, error) {
-	return n, nil
-}
+func (v *dadlCustomTypeValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
 
-func (n *dadlSchemaTypeNode) childParser() (NodeParser, error) {
-	return &dadlSchemaTypeParser{}, nil
-}
-
-func (n *dadlSchemaTypeNode) isSimple() bool {
-	return false
-}
-
-type dadlSchemaTypeParser struct {
-}
-
-func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
-	//println("[dadlSchemaTypeParser.parse]", value)
-
-	var err error
+	// println("dadlCustomTypeValue [parseChild]:", value)
+	// var err error
 	res := map[string]string{}
 	match := typeBaseRe.FindStringSubmatch(strings.TrimSpace(value))
 	// var keyValue string
@@ -62,6 +42,8 @@ func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
 				res[name] = match[i]
 			}
 		}
+	} else {
+		return nil, errors.New("Ivalid type definition")
 	}
 	name := res["name"]
 	baseType := res["baseType"]
@@ -72,83 +54,78 @@ func (p *dadlSchemaTypeParser) parse(ctx *parseContext, value string) error {
 	result := Node{
 		"baseType": baseType,
 	}
-	ctx.parent[name] = result
+	builder.getValue().(Node)[name] = result
+
+	var def Node
+	var val Node
 	if baseType == "struct" {
 		structure := Node{}
 		result["children"] = structure
-		ctx.last = structure
+		def = structure
+		val = structure
 	} else if baseType == "map" {
 		structure := Node{}
 		valueType := Node{}
 		valueType["children"] = structure
 		result["valueType"] = valueType
-		ctx.last = structure
+		def = result
+		val = structure
 	} else {
-		ctx.last = result
-	}
-	ctx.lastSchema, err = ctx.parentSchema.childNode(name)
-	if err != nil {
-		return err
+		def = result
+		val = result
 	}
 
-	newCtx := &parseContext{
-		parentSchema: ctx.parentSchema,
-		lastSchema:   ctx.lastSchema,
-		parent:       result,
-		last:         result,
-	}
 	if baseType == "string" {
-		parseStringArgs(newCtx, strings.TrimSpace(extra), "regex")
+		parseStringArgs(def, strings.TrimSpace(extra), "regex")
 	} else if baseType == "enum" {
-		parseEnumArgs(newCtx, strings.TrimSpace(extra), "values")
+		parseEnumArgs(def, strings.TrimSpace(extra), "values")
 	} else if baseType == "list" {
-		parseListTypeArgs(newCtx, strings.TrimSpace(extra), "values")
+		parseListTypeArgs(def, strings.TrimSpace(extra), "values")
 	} else if baseType == "formula" {
-		parseFormulaArgs(newCtx, strings.TrimSpace(extra), "formula")
+		parseFormulaArgs(def, strings.TrimSpace(extra), "formula")
 	} else if baseType == "sequence" {
-		parseSequenceArgs(newCtx, strings.TrimSpace(extra), "sequence")
+		parseSequenceArgs(def, strings.TrimSpace(extra), "sequence")
 	} else if baseType == "map" {
-		parseMapTypeArgs(newCtx, strings.TrimSpace(extra), "map")
+		parseMapTypeArgs(def, strings.TrimSpace(extra), "map")
 	}
+
+	return &nodeInfo{
+		valueType: v,
+		builder: &delegatedValueBuilder{
+			get: func() interface{} {
+				return val
+			},
+			set: func(interface{}) {
+				panic("Not supported")
+			},
+		},
+	}, nil
+}
+
+func (v *dadlCustomTypeValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
+	return nil, nil, errors.New("not supported")
+}
+
+func (v *dadlCustomTypeValue) toRegex() string {
+	return ".*"
+}
+
+func parseStringArgs(def Node, value string, key string) error {
+	def[key] = strings.TrimSpace(value)
 	return nil
 }
 
-type dadlStructureSchemaNode struct {
-	children map[string]SchemaNode
-}
-
-func (n *dadlStructureSchemaNode) valueType() valueType {
+func parseEnumArgs(def Node, value string, key string) error {
+	def[key] = strings.Split(value, " ")
 	return nil
 }
 
-func (n *dadlStructureSchemaNode) childNode(name string) (SchemaNode, error) {
-	return n, nil
-}
-
-func (n *dadlStructureSchemaNode) childParser() (NodeParser, error) {
-	return &dadlSchemaTypeParser{}, nil
-}
-
-func (n *dadlStructureSchemaNode) isSimple() bool {
-	return false
-}
-
-func parseStringArgs(ctx *parseContext, value string, key string) error {
-	ctx.parent[key] = strings.TrimSpace(value)
+func parseSequenceArgs(def Node, value string, key string) error {
+	def[key] = map[string]string{"itemType": strings.TrimSpace(value)}
 	return nil
 }
 
-func parseEnumArgs(ctx *parseContext, value string, key string) error {
-	ctx.parent[key] = strings.Split(value, " ")
-	return nil
-}
-
-func parseSequenceArgs(ctx *parseContext, value string, key string) error {
-	ctx.parent[key] = map[string]string{"itemType": strings.TrimSpace(value)}
-	return nil
-}
-
-func parseFormulaArgs(ctx *parseContext, value string, key string) error {
+func parseFormulaArgs(def Node, value string, key string) error {
 	matches := formulaTypeArgsRe.FindAllStringSubmatch(strings.TrimSpace(value), -1)
 	tokens := []map[string]interface{}{}
 	for _, match := range matches {
@@ -165,11 +142,11 @@ func parseFormulaArgs(ctx *parseContext, value string, key string) error {
 			})
 		}
 	}
-	ctx.parent[key] = tokens
+	def[key] = tokens
 	return nil
 }
 
-func parseListTypeArgs(ctx *parseContext, value string, key string) error {
+func parseListTypeArgs(def Node, value string, key string) error {
 	match := listTypeArgsRe.FindStringSubmatch(strings.TrimSpace(value))
 	// var keyValue string
 	res := map[string]string{}
@@ -180,18 +157,18 @@ func parseListTypeArgs(ctx *parseContext, value string, key string) error {
 			}
 		}
 	}
-	ctx.parent["itemType"] = Node{"baseType": res["itemType"]}
+	def["itemType"] = Node{"baseType": res["itemType"]}
 	if res["mappedType"] != "" {
 		mapped := map[string]string{}
 		mapped["mappedType"] = res["mappedType"]
 		mapped["mappedTypeArg1"] = res["mappedTypeArg1"]
 		mapped["mappedTypeArg2"] = res["mappedTypeArg2"]
-		ctx.parent["mapped"] = mapped
+		def["mapped"] = mapped
 	}
 	return nil
 }
 
-func parseMapTypeArgs(ctx *parseContext, value string, key string) error {
+func parseMapTypeArgs(def Node, value string, key string) error {
 	match := mapTypeArgsRe.FindStringSubmatch(strings.TrimSpace(value))
 	// var keyValue string
 	res := map[string]string{}
@@ -202,16 +179,16 @@ func parseMapTypeArgs(ctx *parseContext, value string, key string) error {
 			}
 		}
 	}
-	ctx.parent["keyType"] = Node{"baseType": res["keyType"]}
+	def["keyType"] = Node{"baseType": res["keyType"]}
 	valueType := res["valueType"]
 	if valueType == "" {
 		valueType = "struct"
 	}
-	ctx.parent["valueType"].(Node)["baseType"] = valueType
+	def["valueType"].(Node)["baseType"] = valueType
 	return nil
 }
 
-func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, error) {
+func parseSchema2(schemaName string, resources ResourceProvider) (DadlSchema, error) {
 
 	if schemaName == "dadl" {
 		return GetDadlSchema(), nil
@@ -220,38 +197,6 @@ func parseSchema(schemaName string, resources ResourceProvider) (DadlSchema, err
 	p := NewParser()
 	file, err := resources.GetResource(schemaName)
 	if err != nil {
-		panic(err)
-		//return err
-	}
-	tree, err := p.Parse(file, resources)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Printf("Parsed schema tree: %v\n", tree)
-
-	var typesDefs map[string]interface{}
-	if tree["types"] != nil {
-		typesDefs = tree["types"].(map[string]interface{})
-	} else {
-		typesDefs = map[string]interface{}{}
-	}
-	resolver := newResolver(typesDefs)
-
-	root, err := buildGenericNode(tree["structure"].(map[string]interface{}), resolver)
-
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("Schema: %v\n", root)
-	return &dadlSchemaImpl{root: root}, nil
-}
-
-func parseSchema2(schemaName string, resources ResourceProvider) (DadlSchema2, error) {
-
-	p := NewParser()
-	file, err := resources.GetResource(schemaName)
-	if err != nil {
 		return nil, err
 	}
 	tree, err := p.Parse(file, resources)
@@ -259,7 +204,7 @@ func parseSchema2(schemaName string, resources ResourceProvider) (DadlSchema2, e
 		return nil, err
 	}
 
-	fmt.Printf("Parsed schema tree: %v\n", tree)
+	// fmt.Printf("Parsed schema tree: %v\n", tree)
 
 	var typesDefs map[string]interface{}
 	if tree["types"] != nil {
@@ -273,95 +218,10 @@ func parseSchema2(schemaName string, resources ResourceProvider) (DadlSchema2, e
 		"baseType": "struct",
 		"children": tree["structure"],
 	})
-	// root, err := buildGenericNode(tree["structure"].(map[string]interface{}), resolver)
 
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("Schema: %+v\n", root)
-	return &dadlSchemaImpl2{root: root}, nil
-}
-
-func buildGenericNode(children map[string]interface{}, typeResolver *typeResolver) (SchemaNode, error) {
-	// baseTypes := []string{"string", "int", "enum", "struct"}
-	node := &genericSchemaNode{children: map[string]SchemaNode{}}
-
-	for key, value := range children {
-		value := value.(map[string]interface{})
-		baseType := value["baseType"].(string)
-
-		if baseType == "struct" {
-			child, err := buildGenericNode(value["children"].(map[string]interface{}), typeResolver)
-			if err != nil {
-				return nil, err
-			}
-			node.children[key] = child
-			// }
-			// else if baseType == "map" {
-			// 	keyType, err := typeResolver.resolveType(value["keyType"].(string))
-			// 	if err != nil {
-			// 		return nil, err
-			// 	}
-			// 	var valueType valueType
-			// 	if value["valueType"] != "" {
-			// 		valueType, err = typeResolver.resolveType(value["valueType"].(string))
-			// 		if err != nil {
-			// 			return nil, err
-			// 		}
-			// 	}
-
-			// 	if valueType != nil && valueType.isSimple() {
-			// 		child := simpleMapNode{key: keyType, value: valueType}
-			// 		node.children[key] = &child
-			// 	} else {
-			// 		child, err := buildMapNode(value["value"].(map[string]interface{}), typeResolver)
-			// 		if err != nil {
-			// 			return nil, err
-			// 		}
-			// 		node.children[key] = child
-			// 	}
-			// } else if baseType == "list" {
-			// 	itemType, err := typeResolver.resolveType(value["itemType"].(string))
-			// 	if err != nil {
-			// 		return nil, err
-			// 	}
-			// 	node.children[key] = &childListOnlyNode{childType: &simpleValueLeafNode{name: "", valueType: itemType}}
-		} else {
-			// valueType, err := typeResolver.buildType(value)
-			// if err != nil {
-			// 	return nil, err
-			// }
-			// _, isString := valueType.(*stringValue)
-			// asStruct, isStruct := valueType.(*structValue)
-			// if isStruct {
-			// 	child, err := buildGenericNode(asStruct.children, typeResolver)
-			// 	if err != nil {
-			// 		return nil, err
-			// 	}
-			// 	node.children[key] = child
-			// }
-			// else if isString {
-			// 	node.children[key] = &stringValueNode{name: key}
-			// } else {
-			// 	node.children[key] = &simpleValueLeafNode{name: key, valueType: valueType}
-			// }
-		}
-	}
-	return node, nil
-}
-
-func buildMapNode(value map[string]interface{}, typeResolver *typeResolver) (SchemaNode, error) {
-	node, err := buildGenericNode(value, typeResolver)
-	if err != nil {
-		return nil, err
-	}
-	return &genericMapNode{value: node}, nil
-}
-
-func buildListNode(value map[string]interface{}, typeResolver *typeResolver) (SchemaNode, error) {
-	node, err := buildGenericNode(value, typeResolver)
-	if err != nil {
-		return nil, err
-	}
-	return &customItemListNode{value: node}, nil
+	// fmt.Printf("Schema: %+v\n", root)
+	return &dadlSchemaImpl{root: root}, nil
 }

@@ -46,32 +46,37 @@ func printHandler(filePath string, treePath string) {
 	defer file.Close()
 
 	p := parser.NewParser()
-	tree, err := p.Parse2(file, parser.NewFSResourceProvider(filepath.Dir(filePath)))
+	tree, err := p.Parse(file, parser.NewFSResourceProvider(filepath.Dir(filePath)))
 
 	if err != nil {
 		println("Err: ", err.Error())
 		return
 	}
 
-	tree, _ = filterTree(tree, treePath)
-	printTree(tree, treePath)
+	result, _ := filterTree(tree, treePath)
+	printTree(result, treePath)
 }
 
-func filterTree(root map[string]interface{}, filterPath string) (map[string]interface{}, error) {
+func filterTree(root map[string]interface{}, filterPath string) (interface{}, error) {
 	if filterPath == "." {
 		return root, nil
 	}
-	node := root
+	var node interface{} = root
 	pathElements := strings.Split(filterPath, ".")
 	for _, pathElement := range pathElements {
-		node = node[pathElement].(map[string]interface{})
+		node = node.(map[string]interface{})[pathElement]
 	}
 	return node, nil
 }
 
-func printTree(root map[string]interface{}, rootName string) {
-	tree := treeprint.NewWithRoot(rootName)
-	buildMapChildren(tree, root)
+func printTree(root interface{}, rootName string) {
+	var tree treeprint.Tree
+	if asMap, ok := root.(map[string]interface{}); ok {
+		tree = treeprint.NewWithRoot(rootName)
+		buildMapChildren(tree, asMap)
+	} else {
+		tree = addChild(treeprint.New(), rootName, root)
+	}
 	fmt.Println(tree.String())
 }
 
@@ -92,22 +97,25 @@ func buildSliceChildren(tree treeprint.Tree, children []interface{}) {
 	}
 }
 
-func addChild(tree treeprint.Tree, key string, value interface{}) {
+func addChild(tree treeprint.Tree, key string, value interface{}) treeprint.Tree {
 	if asMap, ok := value.(map[string]interface{}); ok {
 		branch := tree.AddBranch(key)
 		buildMapChildren(branch, asMap)
+		return branch
 	} else if asSlice, ok := value.([]interface{}); ok {
 		branch := tree.AddBranch(key)
 		buildSliceChildren(branch, asSlice)
+		return branch
 	} else if asString, ok := value.(string); ok {
 		if strings.Contains(asString, "\n") {
-			tree.AddNode(key + ":\n" + asString)
+			return tree.AddBranch(key + ":\n" + asString)
 		} else {
-			tree.AddNode(key + ": " + asString)
+			return tree.AddBranch(key + ": " + asString)
 		}
 	} else if asInt, ok := value.(int); ok {
-		tree.AddNode(fmt.Sprintf("%s: %v", key, asInt))
+		return tree.AddBranch(fmt.Sprintf("%s: %v", key, asInt))
 	} else if asBool, ok := value.(bool); ok {
-		tree.AddNode(fmt.Sprintf("%s: %v", key, asBool))
+		return tree.AddBranch(fmt.Sprintf("%s: %v", key, asBool))
 	}
+	return tree
 }

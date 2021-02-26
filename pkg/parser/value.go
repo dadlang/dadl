@@ -46,14 +46,14 @@ type stringValue struct {
 }
 
 func (v *stringValue) parse(builder valueBuilder, value string) error {
-	println("stringValue [parse]:", value)
+	// println("stringValue [parse]:", value)
 	builder.setValue(strings.TrimSpace(value))
 	v.indentLock = -1
 	return nil
 }
 
 func (v *stringValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	println("stringValue [parseChild]:", value)
+	// println("stringValue [parseChild]:", value)
 	if v.indentLock < 0 {
 		v.indentLock = calcIndentWeight(value)
 	}
@@ -343,13 +343,13 @@ type listValue struct {
 }
 
 func (v *listValue) parse(builder valueBuilder, value string) error {
-	println("listValue [parse]:", value)
+	// println("listValue [parse]:", value)
 	builder.setValue([]interface{}{})
 	return nil
 }
 
 func (v *listValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	println("listValue [parseChild]:", value)
+	// println("listValue [parseChild]:", value)
 
 	childvalueBuilder := &delegatedValueBuilder{
 		get: func() interface{} {
@@ -382,13 +382,15 @@ type mapValue struct {
 }
 
 func (v *mapValue) parse(builder valueBuilder, value string) error {
-	println("mapValue [parse]:", value)
-	builder.setValue(map[string]interface{}{})
+	// println("mapValue [parse]:", value)
+	if builder.getValue() == nil {
+		builder.setValue(map[string]interface{}{})
+	}
 	return nil
 }
 
 func (v *mapValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	println("mapValue [parseChild]:", value)
+	// println("mapValue [parseChild]:", value)
 
 	//TODO
 	parts := strings.SplitN(strings.TrimSpace(value), " ", 2)
@@ -443,13 +445,13 @@ type structValue struct {
 }
 
 func (v *structValue) parse(builder valueBuilder, value string) error {
-	println("structValue [parse]:", value)
+	// println("structValue [parse]:", value)
 	builder.setValue(map[string]interface{}{})
 	return nil
 }
 
 func (v *structValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	println("structValue [parseChild]:", value)
+	// println("structValue [parseChild]:", value)
 
 	res := map[string]string{}
 	match := keyWithDelegatedValueRe.FindStringSubmatch(strings.TrimSpace(value))
@@ -467,7 +469,7 @@ func (v *structValue) parseChild(builder valueBuilder, value string) (*nodeInfo,
 	key := removeQuotes(res["key"])
 
 	if childType, ok := v.children[key]; ok { //valueBuilder.getValue()[key]; ok {
-		childvalueBuilder := &delegatedValueBuilder{
+		childValueBuilder := &delegatedValueBuilder{
 			get: func() interface{} {
 				return builder.getValue().(map[string]interface{})[key]
 			},
@@ -478,14 +480,15 @@ func (v *structValue) parseChild(builder valueBuilder, value string) (*nodeInfo,
 				builder.getValue().(map[string]interface{})[key] = value
 			},
 		}
-		childType.parse(childvalueBuilder, res["rest"])
-
-		println("key: ", key)
+		err := childType.parse(childValueBuilder, res["rest"])
+		if err != nil {
+			return nil, err
+		}
 
 		builder.getValue()
 		return &nodeInfo{
 			valueType: childType,
-			builder:   childvalueBuilder,
+			builder:   childValueBuilder,
 		}, nil
 	}
 	return nil, errors.New("No child with name: " + key)

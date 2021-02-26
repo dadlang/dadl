@@ -19,7 +19,7 @@ func TestParserE2E(t *testing.T) {
 		}
 		defer file.Close()
 
-		got, err := parser.Parse2(file, NewFSResourceProvider(filepath.Dir(fullPath)))
+		got, err := parser.Parse(file, NewFSResourceProvider(filepath.Dir(fullPath)))
 		if err != nil {
 			t.Fatalf("could not parse %v, %v", tc.testFile, err)
 		}
