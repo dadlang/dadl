@@ -2,7 +2,9 @@ package parser
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -73,10 +75,6 @@ func (v *stringValue) toRegex() string {
 	return ".*"
 }
 
-func (v *stringValue) isSimple() bool {
-	return true
-}
-
 func (v *stringValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
 	return nil, nil, errors.New("Not supported")
 }
@@ -103,10 +101,6 @@ func (v *boolValue) getChild(name string, builder valueBuilder) (valueType, valu
 
 func (v *boolValue) toRegex() string {
 	return "(?:true)|(?:false)"
-}
-
-func (v *boolValue) isSimple() bool {
-	return true
 }
 
 type constantValue struct {
@@ -209,9 +203,10 @@ type formulaValue struct {
 }
 
 func (v *formulaValue) parse(builder valueBuilder, value string) error {
-
+	println("formulaValue [parse]:", value, "|regex:", v.toRegex())
 	if v.re == nil {
 		var sb strings.Builder
+		sb.WriteString("^")
 		for _, token := range v.formula {
 			if token.name != "" {
 				sb.WriteString("(?P<" + token.name + ">" + token.valueType.toRegex() + ")")
@@ -219,6 +214,7 @@ func (v *formulaValue) parse(builder valueBuilder, value string) error {
 				sb.WriteString("(?:" + token.valueType.toRegex() + ")")
 			}
 		}
+		sb.WriteString("$")
 		v.re = regexp.MustCompile(sb.String())
 	}
 	var err error
@@ -231,6 +227,8 @@ func (v *formulaValue) parse(builder valueBuilder, value string) error {
 				parsed[name] = match[i]
 			}
 		}
+	} else {
+		return errors.New("No match for: " + value)
 	}
 
 	result := map[string]interface{}{}
@@ -382,7 +380,7 @@ type mapValue struct {
 }
 
 func (v *mapValue) parse(builder valueBuilder, value string) error {
-	// println("mapValue [parse]:", value)
+	println("mapValue [parse]:", value)
 	if builder.getValue() == nil {
 		builder.setValue(map[string]interface{}{})
 	}
@@ -390,7 +388,7 @@ func (v *mapValue) parse(builder valueBuilder, value string) error {
 }
 
 func (v *mapValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	// println("mapValue [parseChild]:", value)
+	println("mapValue [parseChild]:", value)
 
 	//TODO
 	parts := strings.SplitN(strings.TrimSpace(value), " ", 2)
@@ -407,10 +405,17 @@ func (v *mapValue) parseChild(builder valueBuilder, value string) (*nodeInfo, er
 		},
 	}
 	if len(parts) > 1 {
-		v.valueType.parse(childValueBuilder, parts[1])
+		fmt.Printf("pass: %v [%+v]\n", parts[1], reflect.TypeOf(v.valueType))
+		err := v.valueType.parse(childValueBuilder, parts[1])
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		//TODO
-		v.valueType.parse(childValueBuilder, "")
+		err := v.valueType.parse(childValueBuilder, "")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	builder.getValue()
@@ -498,10 +503,6 @@ func (v *structValue) toRegex() string {
 	return ""
 }
 
-func (v *structValue) isSimple() bool {
-	return false
-}
-
 func (v *structValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
 	if c, ok := v.children[name]; ok {
 
@@ -519,4 +520,120 @@ func (v *structValue) getChild(name string, builder valueBuilder) (valueType, va
 		}, nil
 	}
 	return nil, nil, errors.New("Not found: " + name)
+}
+
+type oneofValueOption struct {
+	name      string
+	valueType valueType
+}
+
+type oneofValue struct {
+	options     []oneofValueOption
+	_re         *regexp.Regexp
+	_optionsMap map[string]valueType
+}
+
+func (v *oneofValue) parse(builder valueBuilder, value string) error {
+	println("oneofValue [parse]:", value)
+	if v._re == nil {
+		v._optionsMap = map[string]valueType{}
+		var sb strings.Builder
+		for _, option := range v.options {
+			if sb.Len() > 0 {
+				sb.WriteString("|")
+			}
+			println(option.name, "->", option.valueType.toRegex())
+			sb.WriteString("(?P<" + option.name + ">" + "^" + option.valueType.toRegex() + "$" + ")")
+
+			v._optionsMap[option.name] = option.valueType
+		}
+		v._re = regexp.MustCompile(sb.String())
+	}
+
+	parsed := map[string]interface{}{}
+	match := v._re.FindStringSubmatch(strings.TrimSpace(value))
+	// var keyValue string
+	if match != nil {
+		for i, name := range v._re.SubexpNames() {
+			if i != 0 && match[i] != "" {
+				parsed["type"] = name
+				v._optionsMap[name].parse(&delegatedValueBuilder{
+					get: func() interface{} {
+						panic("Not expected")
+					},
+					set: func(value interface{}) {
+						parsed[name] = value
+					},
+				}, match[i])
+			}
+		}
+	} else {
+		return errors.New("No matchfor: " + value)
+	}
+
+	builder.setValue(parsed)
+	return nil
+}
+
+func (v *oneofValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
+	println("oneofValue [parseChild]:", value)
+	return nil, errors.New("Not supported")
+}
+
+func (v *oneofValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
+	return nil, nil, errors.New("Not supported")
+}
+
+func (v *oneofValue) toRegex() string {
+	var sb strings.Builder
+	for _, option := range v.options {
+		if sb.Len() > 0 {
+			sb.WriteString("|")
+		}
+		sb.WriteString("(?:" + option.valueType.toRegex() + ")")
+	}
+	return sb.String()
+}
+
+type complexValue struct {
+	textValue   valueType
+	structValue valueType
+}
+
+func (v *complexValue) parse(builder valueBuilder, value string) error {
+	println("complexValue [parse]:", value)
+	return nil
+}
+
+func (v *complexValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
+	println("complexValue [parseChild]:", value)
+	return &nodeInfo{valueType: v, builder: builder}, nil
+}
+
+func (v *complexValue) toRegex() string {
+	return v.textValue.toRegex()
+}
+
+func (v *complexValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
+	return nil, nil, errors.New("Not supported")
+}
+
+type delegatedValue struct {
+	target valueType
+}
+
+func (v *delegatedValue) parse(builder valueBuilder, value string) error {
+	return v.target.parse(builder, value)
+}
+
+func (v *delegatedValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
+	return v.target.parseChild(builder, value)
+}
+
+func (v *delegatedValue) toRegex() string {
+	return ".*" //v.target.toRegex()
+}
+
+func (v *delegatedValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
+	return v.target.getChild(name, builder)
 }

@@ -4,6 +4,9 @@
 hostname string [A-Za-z0-9-_.]+
 networkPort int 0..65535 #Network port number
 address formula <host hostname> ':' <port networkPort>
+complex struct
+    real string
+    imagined int
 
 [structure]
 sampleAddress address
@@ -13,3 +16,4 @@ parent
     child1 hostname
     child2 
         subchild1 hostname
+sampleComplex complex

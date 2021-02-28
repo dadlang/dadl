@@ -1,0 +1,26 @@
+@schema dadl 0.1
+
+[types]
+stringType formula 'string' <regex string>
+identifierType formula 'identifier'
+intType formula 'int'
+numberType formula 'number'
+boolType formula 'bool'
+enumType formula 'enum ' <values sequence identifier>
+formulaType formula 'formula'
+sequenceType formula 'sequence ' <itemType identifier>
+binaryTypeFormat enum base64 hex
+binaryType formula 'binary ' <format binaryTypeFormat>
+listType formula 'list ' <itemType identifier>
+mapType formula 'map[' <keyType typeReference> ']' [<valueType typeReference>]
+typeReference formula <typeName identifier>
+#structType complex
+#    formula ['struct']
+#    map[identifier]type 
+typeDef oneof stringType identifierType intType numberType boolType enumType formulaType sequenceType binaryType listType mapType
+typeDefWithComment formula <type typeDef> ' #' <comment string>
+
+[structure]
+sampleTypes map[identifier]typeDefWithComment
+#structure map[identifier]typeWithComment
+#sampleType typeDefWithComment

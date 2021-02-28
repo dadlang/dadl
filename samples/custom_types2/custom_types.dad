@@ -17,3 +17,7 @@ parent
 		subchild1 text2
 
 sampleAddress 127.0.0.1:8080
+
+sampleComplex
+	real 5
+	imagined 7

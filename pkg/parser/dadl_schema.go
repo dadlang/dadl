@@ -79,6 +79,8 @@ func (v *dadlCustomTypeValue) parseChild(builder valueBuilder, value string) (*n
 		parseStringArgs(def, strings.TrimSpace(extra), "regex")
 	} else if baseType == "enum" {
 		parseEnumArgs(def, strings.TrimSpace(extra), "values")
+	} else if baseType == "oneof" {
+		parseOneofArgs(def, strings.TrimSpace(extra), "options")
 	} else if baseType == "list" {
 		parseListTypeArgs(def, strings.TrimSpace(extra), "values")
 	} else if baseType == "formula" {
@@ -116,6 +118,11 @@ func parseStringArgs(def Node, value string, key string) error {
 }
 
 func parseEnumArgs(def Node, value string, key string) error {
+	def[key] = strings.Split(value, " ")
+	return nil
+}
+
+func parseOneofArgs(def Node, value string, key string) error {
 	def[key] = strings.Split(value, " ")
 	return nil
 }

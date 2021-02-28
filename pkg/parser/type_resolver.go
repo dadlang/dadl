@@ -18,6 +18,8 @@ func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, err
 			return &stringValue{regex: typeDef["regex"].(string)}, nil
 		}
 		return &stringValue{}, nil
+	case "identifier":
+		return &stringValue{regex: "[A-Za-z-0-9_-]+"}, nil
 	case "int":
 		return &intValue{}, nil
 	case "number":
@@ -80,6 +82,19 @@ func (r *typeResolver) buildType(typeDef map[string]interface{}) (valueType, err
 			}
 		}
 		return &structValue{children: children}, nil
+	case "oneof":
+		optionsDef := typeDef["options"].([]string)
+		options := make([]oneofValueOption, len(optionsDef))
+		for i, typeName := range optionsDef {
+			valueType, err := r.resolveType(typeName)
+			if err != nil {
+				return nil, err
+			}
+			options[i] = oneofValueOption{name: typeName, valueType: valueType}
+		}
+		return &oneofValue{options: options}, nil
+	case "complex":
+		return &complexValue{textValue: &stringValue{}}, nil
 	}
 	return r.resolveType(typeDef["baseType"].(string))
 }
@@ -88,14 +103,18 @@ func (r *typeResolver) resolveType(typeName string) (valueType, error) {
 	if resolved, ok := r.resolvedTypes[typeName]; ok {
 		return resolved, nil
 	}
-	var err error
 	typeDef := r.typesDefs[typeName]
 	if typeDef == nil {
 		return nil, errors.New("Unknown type, no definition for: " + typeName)
 	}
-	r.resolvedTypes[typeName], err = r.buildType(typeDef.(map[string]interface{}))
+	delegate := delegatedValue{}
+	// register delegated type to support circural dependencies
+	r.resolvedTypes[typeName] = &delegate
+	resolvedType, err := r.buildType(typeDef.(map[string]interface{}))
 	if err != nil {
 		return nil, err
 	}
+	delegate.target = resolvedType
+	r.resolvedTypes[typeName] = resolvedType
 	return r.resolvedTypes[typeName], nil
 }
