@@ -7,20 +7,27 @@ intType formula 'int'
 numberType formula 'number'
 boolType formula 'bool'
 enumType formula 'enum ' <values sequence identifier>
-formulaType formula 'formula'
+
+formulaElementVariable formula '<' <name identifier> ' ' <type identifier> '>'
+
+formulaElementConstant string '.*?'
+formulaElement oneof formulaElementVariable formulaElementConstant formulaElementOptional
+formulaElements sequence formulaElement
+formulaElementOptional formula '[' <elements formulaElements> ']'
+formulaType formula 'formula ' <elements formulaElements>
 sequenceType formula 'sequence ' <itemType identifier>
 binaryTypeFormat enum base64 hex
 binaryType formula 'binary ' <format binaryTypeFormat>
 listType formula 'list ' <itemType identifier>
 mapType formula 'map[' <keyType typeReference> ']' [<valueType typeReference>]
 typeReference formula <typeName identifier>
-#structType complex
-#    formula ['struct']
-#    map[identifier]type 
-typeDef oneof stringType identifierType intType numberType boolType enumType formulaType sequenceType binaryType listType mapType
-typeDefWithComment formula <type typeDef> ' #' <comment string>
+structType complex
+    text formula ['struct']
+    structure map[identifier]typeDef 
+typeDef oneof stringType identifierType intType numberType boolType enumType formulaType sequenceType binaryType listType mapType structType
 
 [structure]
-sampleTypes map[identifier]typeDefWithComment
-#structure map[identifier]typeWithComment
-#sampleType typeDefWithComment
+sampleTypes map[identifier]typeDef
+#structure map[identifier]typeDef
+#sampleType typeDef
+sampleFormula formulaType

@@ -1,15 +1,36 @@
 @schema dadl 0.1
 
 [types]
-identifier string [A-Za-z0-9_-]*
-typeDef formula <name identifier> ' ' <type identifier> ' #' <desc string>
+typeDef complex
+    text formula <type identifier> [' #' <desc string>]
+    structure list typeDef
+httpMethod enum GET POST PUT PATCH DELETE
+path complex
+    text string /.*
+    structure list pathOrOperation
+operation formula <verb httpMethod> <interactor string>
+pathOrOperation oneof path operation
+
+fuckup complex
+    text string
+    structure list string
 
 [structure]
+fuckup fuckup
 name string
 codename string
-#global
-#    types list typeDef 
+global
+    types list typeDef 
 
 modules map[string]
     name string
     namespace string
+    types map[string]typeDef
+    entities map[string]map[string]typeDef
+    interactors map[string]
+        name string
+        type string
+        input list typeDef
+        output list typeDef
+    transport
+        rest list pathOrOperation

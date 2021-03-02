@@ -11,7 +11,7 @@ import (
 func TestParserE2E(t *testing.T) {
 	parser := NewParser()
 	for _, tc := range testCases {
-		println("Test:", tc.name)
+		println("\n========================\nTest:", tc.name, "\n========================")
 		fullPath := "../../samples/" + tc.testFile
 		file, err := os.Open(fullPath)
 		if err != nil {

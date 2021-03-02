@@ -1,4 +1,4 @@
-@schema ../project.dads
+@schema ./project.dads [modules._]
 
 name Cart
 namespace cart
@@ -11,7 +11,7 @@ Item struct
 [entities]
 Cart
     userId UserId
-    items Sequence<Item>
+    items Sequence
     
 [interactors.AddItem]
 name Add Item
@@ -21,7 +21,7 @@ input
     item Item #Item to add
 
 [interactors.GetCart]
-name Add Item
+name Get Cart
 type query
 input
     userId UserId #Identifier of the user
@@ -36,8 +36,11 @@ input
 
 [transport.rest]
 /v1
-    /cart
-        GET GetCart
-        DELETE EmptyCart
-        /add
-            POST AddItem
+/v2
+    /first
+#    GET GetCart
+#    /cart
+#        GET GetCart
+#        DELETE EmptyCart
+#        /add
+#            POST AddItem

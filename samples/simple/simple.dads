@@ -2,6 +2,6 @@
 
 [structure]
 someRoot
-    firstChild string
-    secondChild
-        nestedChild int
+	firstChild string
+	secondChild struct
+		nestedChild int

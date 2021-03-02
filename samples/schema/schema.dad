@@ -1,17 +1,19 @@
 @schema schema.dads
 
-#[structure]
-#someRoot
-#    firstChild string
-#    secondChild
-#        nestedChild int
-
 sampleTypes
-#    string string [A-Z] #first type
-#    int int #second type
-#    bool bool #bool type
-#    number number #number type
-#    enum enum value1 value2 value3 #enum type
-#    sequence sequence someType #sequence type
-#    list list someType #list type
-    map map[string]int #map type
+    string string [A-Z]+
+    int int
+    bool bool 
+    number number
+    enum enum value1 value2 value3
+    sequence sequence someType
+    list list someType
+    sampleStruct struct
+        firstField string
+        secondField int
+        children
+            nestedField bool
+    map map[string]int 
+    formula formula <var1 type1>
+sampleFormula formula <var1 type1> '!' <var2 type2> ['#' <comment string> ['@' <magic string>]]
+

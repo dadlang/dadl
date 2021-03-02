@@ -1,22 +1,28 @@
 @schema ./project.dads
 
+fuckup string
+    list value1
+    list value2
+
 name Online Boutique
 codename boutique
 
 #[global.types]
 #SomeType String
 
-[modules.cart << ./modules/sample.dad]
+[modules.sample << ./modules/sample.dad]
 name overridden
 
 [modules.Another]
 name Anooooother
-#types
-#    Other String
+types
+    Other String
 
-#[global.types]
-#UserId String
-#ProductId String
+[global.types]
+UserId String
+ProductId String
+
+[modules.cart << ./modules/cart.dad]
 
 #[contexts]
 #user

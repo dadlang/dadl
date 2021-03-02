@@ -2,9 +2,8 @@ package parser
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"math/big"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ type valueType interface {
 	parse(builder valueBuilder, value string) error
 	parseChild(builder valueBuilder, value string) (*nodeInfo, error)
 	getChild(name string, builder valueBuilder) (valueType, valueBuilder, error)
+	supportsChildren() bool
 }
 
 type binaryAsTextFormat int
@@ -24,22 +24,191 @@ const (
 	binaryFormatHex
 )
 
+type metaBuilder struct {
+	meta map[string]interface{}
+}
+
+func (b *metaBuilder) getMeta(name string) interface{} {
+	return b.meta[name]
+}
+
+func (b *metaBuilder) setMeta(name string, value interface{}) {
+	if b.meta == nil {
+		b.meta = map[string]interface{}{}
+	}
+	b.meta[name] = value
+}
+
 type valueBuilder interface {
-	getValue() interface{}
-	setValue(value interface{})
+	getSimpleValue() interface{}
+	setSimpleValue(value interface{})
+	getFieldBuilder(name string) valueBuilder
+	getListItemBuilder() valueBuilder
+	setMeta(name string, value interface{})
+	getMeta(name string) interface{}
+}
+
+type dynamicMapOrListValueBuilder struct {
+	metaBuilder
+	value interface{}
+}
+
+func (b *dynamicMapOrListValueBuilder) getSimpleValue() interface{} {
+	panic("Not supported")
+}
+
+func (b *dynamicMapOrListValueBuilder) setSimpleValue(value interface{}) {
+	panic("Not supported")
+}
+
+func (b *dynamicMapOrListValueBuilder) getFieldBuilder(name string) valueBuilder {
+	if b.value == nil {
+		b.value = map[string]interface{}{}
+	}
+	return &itemInMapValueBuilder{
+		parent:    b.value.(map[string]interface{}),
+		fieldName: name,
+	}
+}
+
+func (b *dynamicMapOrListValueBuilder) getListItemBuilder() valueBuilder {
+	if b.value == nil {
+		b.value = []interface{}{}
+	}
+	idx := len(b.value.([]interface{}))
+	b.value = append(b.value.([]interface{}), nil)
+	return &itemInListValueBuilder{
+		parent: b.value.([]interface{}),
+		idx:    idx,
+	}
+}
+
+type itemInMapValueBuilder struct {
+	metaBuilder
+	parent    map[string]interface{}
+	fieldName string
+}
+
+func (b *itemInMapValueBuilder) getSimpleValue() interface{} {
+	return b.parent[b.fieldName]
+}
+
+func (b *itemInMapValueBuilder) setSimpleValue(value interface{}) {
+	b.parent[b.fieldName] = value
+}
+
+func (b *itemInMapValueBuilder) getFieldBuilder(name string) valueBuilder {
+	if b.parent[b.fieldName] == nil {
+		b.parent[b.fieldName] = map[string]interface{}{}
+	}
+	return &itemInMapValueBuilder{
+		parent:    b.parent[b.fieldName].(map[string]interface{}),
+		fieldName: name,
+	}
+}
+
+func (b *itemInMapValueBuilder) getListItemBuilder() valueBuilder {
+	if b.parent[b.fieldName] == nil {
+		b.parent[b.fieldName] = []interface{}{}
+	}
+	idx := len(b.parent[b.fieldName].([]interface{}))
+	b.parent[b.fieldName] = append(b.parent[b.fieldName].([]interface{}), nil)
+	return &itemInListValueBuilder{
+		parent: b.parent[b.fieldName].([]interface{}),
+		idx:    idx,
+	}
+}
+
+type itemInListValueBuilder struct {
+	metaBuilder
+	parent []interface{}
+	idx    int
+}
+
+func (b *itemInListValueBuilder) getSimpleValue() interface{} {
+	return b.parent[b.idx]
+}
+
+func (b *itemInListValueBuilder) setSimpleValue(value interface{}) {
+	b.parent[b.idx] = value
+}
+
+func (b *itemInListValueBuilder) getFieldBuilder(name string) valueBuilder {
+	if b.parent[b.idx] == nil {
+		b.parent[b.idx] = map[string]interface{}{}
+	}
+	return &itemInMapValueBuilder{
+		parent:    b.parent[b.idx].(map[string]interface{}),
+		fieldName: name,
+	}
+}
+
+func (b *itemInListValueBuilder) getListItemBuilder() valueBuilder {
+	if b.parent[b.idx] == nil {
+		b.parent[b.idx] = []interface{}{}
+	}
+	idx := len(b.parent[b.idx].([]interface{}))
+	b.parent[b.idx] = append(b.parent[b.idx].([]interface{}), nil)
+	return &itemInListValueBuilder{
+		parent: b.parent[b.idx].([]interface{}),
+		idx:    idx,
+	}
 }
 
 type delegatedValueBuilder struct {
+	metaBuilder
 	set func(value interface{})
 	get func() interface{}
 }
 
-func (b *delegatedValueBuilder) getValue() interface{} {
+func (b *delegatedValueBuilder) getSimpleValue() interface{} {
 	return b.get()
 }
 
-func (b *delegatedValueBuilder) setValue(value interface{}) {
+// func (b *delegatedValueBuilder) setValue(value interface{}) {
+// 	b.set(value)
+// }
+
+func (b *delegatedValueBuilder) setSimpleValue(value interface{}) {
 	b.set(value)
+}
+func (b *delegatedValueBuilder) getField(name string) interface{} {
+	if b.get() == nil {
+		b.set(map[string]interface{}{})
+	}
+	return b.get().(map[string]interface{})[name]
+}
+func (b *delegatedValueBuilder) setField(name string, value interface{}) {
+	if b.get() == nil {
+		b.set(map[string]interface{}{})
+	}
+	b.get().(map[string]interface{})[name] = value
+}
+func (b *delegatedValueBuilder) addListElement(value interface{}) int {
+	if b.get() == nil {
+		b.set([]interface{}{})
+	}
+	newSequence := append(b.get().([]interface{}), value)
+	b.set(newSequence)
+	return len(newSequence) - 1
+}
+
+func (b *delegatedValueBuilder) getListElement(idx int) interface{} {
+	if b.get() == nil {
+		b.set([]interface{}{})
+	}
+	return b.get().([]interface{})[idx]
+}
+
+func (b *delegatedValueBuilder) setListElement(idx int, value interface{}) {
+	if b.get() == nil {
+		b.set([]interface{}{})
+	}
+	if len(b.get().([]interface{})) == idx {
+		b.set(append(b.get().([]interface{}), value))
+	} else {
+		b.get().([]interface{})[idx] = value
+	}
 }
 
 type stringValue struct {
@@ -48,22 +217,22 @@ type stringValue struct {
 }
 
 func (v *stringValue) parse(builder valueBuilder, value string) error {
-	// println("stringValue [parse]:", value)
-	builder.setValue(strings.TrimSpace(value))
+	log.Println("stringValue [parse]:", value)
+	builder.setSimpleValue(strings.TrimSpace(value))
 	v.indentLock = -1
 	return nil
 }
 
 func (v *stringValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	// println("stringValue [parseChild]:", value)
+	log.Println("stringValue [parseChild]:", value)
 	if v.indentLock < 0 {
 		v.indentLock = calcIndentWeight(value)
 	}
 	value = value[v.indentLock:]
-	if existingVal := builder.getValue(); existingVal != nil && existingVal != "" {
-		builder.setValue(existingVal.(string) + "\n" + value)
+	if existingVal := builder.getSimpleValue(); existingVal != nil && existingVal != "" {
+		builder.setSimpleValue(existingVal.(string) + "\n" + value)
 	} else {
-		builder.setValue(value)
+		builder.setSimpleValue(value)
 	}
 	return &nodeInfo{valueType: v, builder: builder}, nil
 }
@@ -72,11 +241,15 @@ func (v *stringValue) toRegex() string {
 	if v.regex != "" {
 		return v.regex
 	}
-	return ".*"
+	return ".*?"
 }
 
 func (v *stringValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("[stringValue] Not supported")
+}
+
+func (v *stringValue) supportsChildren() bool {
+	return false
 }
 
 type boolValue struct {
@@ -87,12 +260,12 @@ func (v *boolValue) parse(builder valueBuilder, value string) error {
 	if err != nil {
 		return err
 	}
-	builder.setValue(boolVal)
+	builder.setSimpleValue(boolVal)
 	return nil
 }
 
 func (v *boolValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	return nil, errors.New("Not supported")
+	return nil, errors.New("[boolValue] Not supported")
 }
 
 func (v *boolValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
@@ -103,11 +276,16 @@ func (v *boolValue) toRegex() string {
 	return "(?:true)|(?:false)"
 }
 
+func (v *boolValue) supportsChildren() bool {
+	return false
+}
+
 type constantValue struct {
 	value string
 }
 
 func (v *constantValue) parse(builder valueBuilder, value string) error {
+	//do nothing
 	return nil
 }
 
@@ -123,6 +301,10 @@ func (v *constantValue) toRegex() string {
 	return regexp.QuoteMeta(v.value)
 }
 
+func (v *constantValue) supportsChildren() bool {
+	return false
+}
+
 type intValue struct {
 	min big.Int
 	max big.Int
@@ -133,7 +315,7 @@ func (v *intValue) parse(builder valueBuilder, value string) error {
 	if err != nil {
 		return err
 	}
-	builder.setValue(intValue)
+	builder.setSimpleValue(intValue)
 	return nil
 }
 
@@ -146,7 +328,11 @@ func (v *intValue) getChild(name string, builder valueBuilder) (valueType, value
 }
 
 func (v *intValue) toRegex() string {
-	return "(-)?\\d+"
+	return "(?:-)?\\d+"
+}
+
+func (v *intValue) supportsChildren() bool {
+	return false
 }
 
 type numberValue struct {
@@ -155,7 +341,7 @@ type numberValue struct {
 }
 
 func (v *numberValue) parse(builder valueBuilder, value string) error {
-	builder.setValue(strings.TrimSpace(value))
+	builder.setSimpleValue(strings.TrimSpace(value))
 	return nil
 }
 
@@ -171,12 +357,16 @@ func (v *numberValue) toRegex() string {
 	return "-?(?:\\d+)|(?:\\d*\\.\\d+)"
 }
 
+func (v *numberValue) supportsChildren() bool {
+	return false
+}
+
 type enumValue struct {
 	values map[string]bool
 }
 
 func (v *enumValue) parse(builder valueBuilder, value string) error {
-	builder.setValue(strings.TrimSpace(value))
+	builder.setSimpleValue(strings.TrimSpace(value))
 	return nil
 }
 
@@ -192,80 +382,107 @@ func (v *enumValue) toRegex() string {
 	return "\\S+"
 }
 
+func (v *enumValue) supportsChildren() bool {
+	return false
+}
+
 type formulaItem struct {
 	name      string
 	valueType valueType
+	optional  bool
+	composite bool
+	children  []formulaItem
 }
 
 type formulaValue struct {
-	formula []formulaItem
-	re      *regexp.Regexp
+	formula  []formulaItem
+	_re      *regexp.Regexp
+	_mapping []formulaItem
+}
+
+func buildMapping(mapping *[]formulaItem, items []formulaItem) {
+	for _, item := range items {
+		if item.composite {
+			buildMapping(mapping, item.children)
+		} else if item.name != "" {
+			*mapping = append(*mapping, item)
+		}
+	}
+}
+
+func (v *formulaValue) initIfRequired() error {
+	if v._re == nil {
+		var sb strings.Builder
+		sb.WriteString("^")
+		sb.WriteString(buildItemsRegex(v.formula, true))
+		sb.WriteString("$")
+		log.Println("formulaValue [regex]:", sb.String())
+		v._re = regexp.MustCompile(sb.String())
+		v._mapping = []formulaItem{}
+		buildMapping(&v._mapping, v.formula)
+	}
+	return nil
 }
 
 func (v *formulaValue) parse(builder valueBuilder, value string) error {
-	println("formulaValue [parse]:", value, "|regex:", v.toRegex())
-	if v.re == nil {
-		var sb strings.Builder
-		sb.WriteString("^")
-		for _, token := range v.formula {
-			if token.name != "" {
-				sb.WriteString("(?P<" + token.name + ">" + token.valueType.toRegex() + ")")
-			} else {
-				sb.WriteString("(?:" + token.valueType.toRegex() + ")")
-			}
-		}
-		sb.WriteString("$")
-		v.re = regexp.MustCompile(sb.String())
-	}
-	var err error
-	parsed := map[string]string{}
-	match := v.re.FindStringSubmatch(strings.TrimSpace(value))
-	// var keyValue string
+	log.Println("formulaValue [parse]:", value)
+	v.initIfRequired()
+	match := v._re.FindStringSubmatch(strings.TrimSpace(value))
 	if match != nil {
-		for i, name := range v.re.SubexpNames() {
-			if i != 0 && name != "" {
-				parsed[name] = match[i]
+		for i, matchValue := range match[1:] {
+			item := v._mapping[i]
+			err := item.valueType.parse(builder.getFieldBuilder(item.name), matchValue)
+			if err != nil {
+				return err
 			}
 		}
 	} else {
 		return errors.New("No match for: " + value)
 	}
-
-	result := map[string]interface{}{}
-	for _, token := range v.formula {
-		if token.name != "" {
-			//	result[token.name],
-			err = token.valueType.parse(&delegatedValueBuilder{
-				set: func(value interface{}) {
-					result[token.name] = value
-				},
-				get: func() interface{} {
-					return result[token.name]
-				},
-			}, parsed[token.name])
-			if err != nil {
-				return err
-			}
-		}
-	}
-	builder.setValue(result)
 	return nil
 }
 
 func (v *formulaValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	return nil, errors.New("Not supported")
+	return nil, errors.New("[formulaValue] Not supported: parseChild")
 }
 
 func (v *formulaValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("[formulaValue] Not supported: getChild")
 }
 
 func (v *formulaValue) toRegex() string {
+	return buildItemsRegex(v.formula, false)
+}
+
+func buildItemsRegex(items []formulaItem, nonCapture bool) string {
 	var sb strings.Builder
-	for _, token := range v.formula {
-		sb.WriteString("(?:" + token.valueType.toRegex() + ")")
+	for _, token := range items {
+		sb.WriteString(buildItemRegex(token, nonCapture))
 	}
 	return sb.String()
+}
+
+func buildItemRegex(item formulaItem, capture bool) string {
+	var sb strings.Builder
+	if item.composite {
+		sb.WriteString("(?:")
+		sb.WriteString(buildItemsRegex(item.children, capture))
+		sb.WriteString(")")
+	} else {
+		if !capture || item.name == "" {
+			sb.WriteString("(?:" + item.valueType.toRegex() + ")")
+		} else {
+			sb.WriteString("(" + item.valueType.toRegex() + ")")
+		}
+	}
+	if item.optional {
+		sb.WriteString("?")
+	}
+	return sb.String()
+}
+
+func (v *formulaValue) supportsChildren() bool {
+	return false
 }
 
 type sequenceValue struct {
@@ -275,44 +492,57 @@ type sequenceValue struct {
 }
 
 func (v *sequenceValue) parse(builder valueBuilder, value string) error {
+	log.Println("sequenceValue [parse]:", value)
 	if v.re == nil {
 		sep := v.separator
 		if sep == "" {
 			sep = "\\s"
 		}
-		v.re = regexp.MustCompile("(?:" + sep + ")?(" + v.itemType.toRegex() + ")")
+		re := "^(" + v.itemType.toRegex() + ")(?:(?:" + sep + ")((?:" + v.itemType.toRegex() + ")(?:(?:" + sep + ")(?:" + v.itemType.toRegex() + "))*))?$"
+		log.Println("sequenceValue [regex]:", re)
+		v.re = regexp.MustCompile(re)
 	}
 
-	var err error
-	matches := v.re.FindAllStringSubmatch(strings.TrimSpace(value), -1)
-	result := make([]interface{}, len(matches))
-	for i, match := range matches {
-		err = v.itemType.parse(&delegatedValueBuilder{
-			get: func() interface{} {
-				return result[i]
-			},
-			set: func(value interface{}) {
-				result[i] = value
-			},
-		}, match[1])
+	match := v.re.FindStringSubmatch(strings.TrimSpace(value))
+	if match == nil {
+		return errors.New("sequenceValue [parse]: No match")
+	}
+	matches := []string{}
+	matches = append(matches, match[1])
+	for match[2] != "" {
+		match = v.re.FindStringSubmatch(match[2])
+		if match == nil {
+			return errors.New("sequenceValue [parse]: No match")
+		}
+		matches = append(matches, match[1])
+	}
+	for _, match := range matches {
+		err := v.itemType.parse(builder.getListItemBuilder(), match)
 		if err != nil {
 			return err
 		}
 	}
-	builder.setValue(result)
 	return nil
 }
 
 func (v *sequenceValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	return nil, errors.New("Not supported")
+	return nil, errors.New("[sequenceValue] Not supported")
 }
 
 func (v *sequenceValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("[sequenceValue] Not supported")
 }
 
 func (v *sequenceValue) toRegex() string {
-	return "(?:" + v.itemType.toRegex() + ")(?:" + v.separator + "(?:" + v.itemType.toRegex() + "))*"
+	sep := v.separator
+	if sep == "" {
+		sep = "\\s"
+	}
+	return "(?:" + v.itemType.toRegex() + ")(?:" + sep + "(?:" + v.itemType.toRegex() + "))*"
+}
+
+func (v *sequenceValue) supportsChildren() bool {
+	return false
 }
 
 type binaryValue struct {
@@ -320,7 +550,8 @@ type binaryValue struct {
 }
 
 func (v *binaryValue) parse(builder valueBuilder, value string) error {
-	builder.setValue(strings.TrimSpace(value))
+	log.Println("binaryValue [parse]:", value)
+	builder.setSimpleValue(strings.TrimSpace(value))
 	return nil
 }
 
@@ -336,33 +567,28 @@ func (v *binaryValue) toRegex() string {
 	return ".*"
 }
 
+func (v *binaryValue) supportsChildren() bool {
+	return false
+}
+
 type listValue struct {
 	childType valueType
 }
 
 func (v *listValue) parse(builder valueBuilder, value string) error {
-	// println("listValue [parse]:", value)
-	builder.setValue([]interface{}{})
+	log.Println("listValue [parse]:", value)
 	return nil
 }
 
 func (v *listValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	// println("listValue [parseChild]:", value)
+	log.Println("listValue [parseChild]:", value)
 
-	childvalueBuilder := &delegatedValueBuilder{
-		get: func() interface{} {
-			return nil
-		},
-		set: func(value interface{}) {
-			builder.setValue(append(builder.getValue().([]interface{}), value))
-		},
-	}
-	v.childType.parse(childvalueBuilder, value)
+	childBuilder := builder.getListItemBuilder()
+	v.childType.parse(childBuilder, value)
 
-	builder.getValue()
 	return &nodeInfo{
 		valueType: v.childType,
-		builder:   childvalueBuilder,
+		builder:   childBuilder,
 	}, nil
 }
 
@@ -374,54 +600,45 @@ func (v *listValue) getChild(name string, builder valueBuilder) (valueType, valu
 	return nil, nil, errors.New("Not found: " + name)
 }
 
+func (v *listValue) supportsChildren() bool {
+	return false
+}
+
 type mapValue struct {
 	keyType   valueType
 	valueType valueType
 }
 
 func (v *mapValue) parse(builder valueBuilder, value string) error {
-	println("mapValue [parse]:", value)
-	if builder.getValue() == nil {
-		builder.setValue(map[string]interface{}{})
-	}
+	log.Println("mapValue [parse]:", value)
+	// if builder.getValue() == nil {
+	// 	builder.setValue(map[string]interface{}{})
+	// }
 	return nil
 }
 
 func (v *mapValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	println("mapValue [parseChild]:", value)
+	log.Println("mapValue [parseChild]:", value)
 
 	//TODO
 	parts := strings.SplitN(strings.TrimSpace(value), " ", 2)
 
-	childValueBuilder := &delegatedValueBuilder{
-		get: func() interface{} {
-			return builder.getValue().(map[string]interface{})[parts[0]]
-		},
-		set: func(value interface{}) {
-			if builder.getValue() == nil {
-				builder.setValue(map[string]interface{}{})
-			}
-			builder.getValue().(map[string]interface{})[parts[0]] = value
-		},
-	}
+	childBuilder := builder.getFieldBuilder(parts[0])
 	if len(parts) > 1 {
-		fmt.Printf("pass: %v [%+v]\n", parts[1], reflect.TypeOf(v.valueType))
-		err := v.valueType.parse(childValueBuilder, parts[1])
+		err := v.valueType.parse(childBuilder, parts[1])
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		//TODO
-		err := v.valueType.parse(childValueBuilder, "")
+		err := v.valueType.parse(childBuilder, "")
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	builder.getValue()
 	return &nodeInfo{
 		valueType: v.valueType,
-		builder:   childValueBuilder,
+		builder:   childBuilder,
 	}, nil
 }
 
@@ -431,18 +648,15 @@ func (v *mapValue) toRegex() string {
 }
 
 func (v *mapValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
-	if builder.getValue() == nil {
-		//	builder.setValue(map[string]interface{}{})
-	}
+	// if builder.getValue() == nil {
+	// 	builder.setValue(map[string]interface{}{})
+	// }
 
-	return v.valueType, &delegatedValueBuilder{
-		get: func() interface{} {
-			return builder.getValue().(map[string]interface{})[name]
-		},
-		set: func(value interface{}) {
-			builder.getValue().(map[string]interface{})[name] = value
-		},
-	}, nil
+	return v.valueType, builder.getFieldBuilder(name), nil
+}
+
+func (v *mapValue) supportsChildren() bool {
+	return true
 }
 
 type structValue struct {
@@ -450,13 +664,13 @@ type structValue struct {
 }
 
 func (v *structValue) parse(builder valueBuilder, value string) error {
-	// println("structValue [parse]:", value)
-	builder.setValue(map[string]interface{}{})
+	log.Println("structValue [parse]:", value)
+	// builder.setValue(map[string]interface{}{})
 	return nil
 }
 
 func (v *structValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	// println("structValue [parseChild]:", value)
+	log.Println("structValue [parseChild]:", value)
 
 	res := map[string]string{}
 	match := keyWithDelegatedValueRe.FindStringSubmatch(strings.TrimSpace(value))
@@ -474,23 +688,11 @@ func (v *structValue) parseChild(builder valueBuilder, value string) (*nodeInfo,
 	key := removeQuotes(res["key"])
 
 	if childType, ok := v.children[key]; ok { //valueBuilder.getValue()[key]; ok {
-		childValueBuilder := &delegatedValueBuilder{
-			get: func() interface{} {
-				return builder.getValue().(map[string]interface{})[key]
-			},
-			set: func(value interface{}) {
-				if builder.getValue() == nil {
-					builder.setValue(map[string]interface{}{})
-				}
-				builder.getValue().(map[string]interface{})[key] = value
-			},
-		}
+		childValueBuilder := builder.getFieldBuilder(key)
 		err := childType.parse(childValueBuilder, res["rest"])
 		if err != nil {
 			return nil, err
 		}
-
-		builder.getValue()
 		return &nodeInfo{
 			valueType: childType,
 			builder:   childValueBuilder,
@@ -505,21 +707,13 @@ func (v *structValue) toRegex() string {
 
 func (v *structValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
 	if c, ok := v.children[name]; ok {
-
-		if builder.getValue() == nil {
-			builder.setValue(map[string]interface{}{})
-		}
-
-		return c, &delegatedValueBuilder{
-			get: func() interface{} {
-				return builder.getValue().(map[string]interface{})[name]
-			},
-			set: func(value interface{}) {
-				builder.getValue().(map[string]interface{})[name] = value
-			},
-		}, nil
+		return c, builder.getFieldBuilder(name), nil
 	}
 	return nil, nil, errors.New("Not found: " + name)
+}
+
+func (v *structValue) supportsChildren() bool {
+	return true
 }
 
 type oneofValueOption struct {
@@ -528,60 +722,54 @@ type oneofValueOption struct {
 }
 
 type oneofValue struct {
-	options     []oneofValueOption
-	_re         *regexp.Regexp
-	_optionsMap map[string]valueType
+	options []oneofValueOption
+	_res    []*regexp.Regexp
+	// _optionsMap map[string]valueType
 }
 
 func (v *oneofValue) parse(builder valueBuilder, value string) error {
-	println("oneofValue [parse]:", value)
-	if v._re == nil {
-		v._optionsMap = map[string]valueType{}
-		var sb strings.Builder
-		for _, option := range v.options {
-			if sb.Len() > 0 {
-				sb.WriteString("|")
-			}
-			println(option.name, "->", option.valueType.toRegex())
-			sb.WriteString("(?P<" + option.name + ">" + "^" + option.valueType.toRegex() + "$" + ")")
-
-			v._optionsMap[option.name] = option.valueType
+	log.Println("oneofValue [parse]:", value)
+	if len(v._res) == 0 {
+		v._res = make([]*regexp.Regexp, len(v.options))
+		for i, option := range v.options {
+			v._res[i] = regexp.MustCompile("^" + option.valueType.toRegex() + "$")
 		}
-		v._re = regexp.MustCompile(sb.String())
 	}
 
-	parsed := map[string]interface{}{}
-	match := v._re.FindStringSubmatch(strings.TrimSpace(value))
-	// var keyValue string
-	if match != nil {
-		for i, name := range v._re.SubexpNames() {
-			if i != 0 && match[i] != "" {
-				parsed["type"] = name
-				v._optionsMap[name].parse(&delegatedValueBuilder{
-					get: func() interface{} {
-						panic("Not expected")
-					},
-					set: func(value interface{}) {
-						parsed[name] = value
-					},
-				}, match[i])
+	// parsed := map[string]interface{}{}
+	trimmedValue := strings.TrimSpace(value)
+	builder.setMeta("lastMatch", nil)
+	for i, re := range v._res {
+		match := re.FindStringSubmatch(trimmedValue)
+		if match != nil {
+			matchedOption := v.options[i]
+			optionName := matchedOption.name
+			log.Println("oneofValue [match]:", optionName)
+			builder.getFieldBuilder("@type").setSimpleValue(optionName)
+			err := matchedOption.valueType.parse(builder.getFieldBuilder("value"), trimmedValue)
+			if err != nil {
+				return err
 			}
+			builder.setMeta("lastMatch", i)
+			return nil
 		}
-	} else {
-		return errors.New("No matchfor: " + value)
 	}
-
-	builder.setValue(parsed)
-	return nil
+	return errors.New("No match for: " + value)
 }
 
 func (v *oneofValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	println("oneofValue [parseChild]:", value)
-	return nil, errors.New("Not supported")
+	log.Println("oneofValue [parseChild]:", value)
+
+	lastMatch := builder.getMeta("lastMatch")
+	if lastMatch != nil {
+		log.Println("oneofValue [lastOption]:", v.options[lastMatch.(int)].name)
+		return v.options[lastMatch.(int)].valueType.parseChild(builder.getFieldBuilder("value"), value)
+	}
+	return nil, errors.New("[oneofValue] Not supported")
 }
 
 func (v *oneofValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("[oneofValue] Not supported")
 }
 
 func (v *oneofValue) toRegex() string {
@@ -595,19 +783,28 @@ func (v *oneofValue) toRegex() string {
 	return sb.String()
 }
 
+func (v *oneofValue) supportsChildren() bool {
+	for _, option := range v.options {
+		if option.valueType.supportsChildren() {
+			return true
+		}
+	}
+	return false
+}
+
 type complexValue struct {
 	textValue   valueType
 	structValue valueType
 }
 
 func (v *complexValue) parse(builder valueBuilder, value string) error {
-	println("complexValue [parse]:", value)
-	return nil
+	log.Println("complexValue [parse]:", value)
+	return v.textValue.parse(builder.getFieldBuilder("value"), value)
 }
 
 func (v *complexValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
-	println("complexValue [parseChild]:", value)
-	return &nodeInfo{valueType: v, builder: builder}, nil
+	log.Println("complexValue [parseChild]:", value)
+	return v.structValue.parseChild(builder.getFieldBuilder("children"), value)
 }
 
 func (v *complexValue) toRegex() string {
@@ -615,7 +812,11 @@ func (v *complexValue) toRegex() string {
 }
 
 func (v *complexValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return v.structValue.getChild(name, builder)
+}
+
+func (v *complexValue) supportsChildren() bool {
+	return v.structValue.supportsChildren()
 }
 
 type delegatedValue struct {
@@ -631,9 +832,14 @@ func (v *delegatedValue) parseChild(builder valueBuilder, value string) (*nodeIn
 }
 
 func (v *delegatedValue) toRegex() string {
-	return ".*" //v.target.toRegex()
+	//TODO
+	return ".*?" //v.target.toRegex()
 }
 
 func (v *delegatedValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
 	return v.target.getChild(name, builder)
+}
+
+func (v *delegatedValue) supportsChildren() bool {
+	return v.target.supportsChildren()
 }

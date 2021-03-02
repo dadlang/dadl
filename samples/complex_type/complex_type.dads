@@ -1,0 +1,14 @@
+@schema dadl 0.1
+
+[types]
+address formula <host identifier> ':' <port int>
+addressExtra complex
+    text address
+    structure
+        extra1 string
+        extra2 int
+
+[structure]
+sampleComplex complex
+    text address
+    structure list addressExtra

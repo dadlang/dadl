@@ -1,0 +1,8 @@
+@schema ./complex_type.dads
+
+sampleComplex root:0000
+    add1:8080
+        extra1 hello
+        extra2 5
+    add2:8080
+        extra2 7

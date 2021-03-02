@@ -19,6 +19,8 @@ func execute() {
 }
 
 func main() {
+	//log.SetFlags(0)
+	//log.SetOutput(ioutil.Discard)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

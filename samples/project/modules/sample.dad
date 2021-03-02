@@ -3,5 +3,5 @@
 name Sample
 namespace sample
 
-#[types]
-#Item struct
+[types]
+Item struct

@@ -16,10 +16,6 @@ func NewParser() Parser {
 	return Parser{}
 }
 
-func newParserWithSchema(schema DadlSchema) Parser {
-	return Parser{schema: schema}
-}
-
 type nodeInfo struct {
 	valueType valueType
 	builder   valueBuilder
@@ -30,9 +26,7 @@ type parseResult struct {
 }
 
 type parseContext struct {
-	// parser       NodeParser
-	parent         Node
-	last           Node
+	schema         DadlSchema
 	indentWeight   int
 	parentNodeInfo *nodeInfo
 	lastNodeInfo   *nodeInfo
@@ -41,23 +35,26 @@ type parseContext struct {
 var groupRe = regexp.MustCompile("^\\[(?P<treePath>[a-zA-Z0-9-_.]*)\\s*(?:<<\\s*(?P<importPath>.+))?\\]$")
 
 func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, error) {
-	//root := Node{}
-	result := parseResult{root: Node{}}
+
+	root := Node{}
+	rootBuilder := &dynamicMapOrListValueBuilder{value: root}
+
+	err := p.ParseWithBuilderAndSchema(reader, resources, rootBuilder, nil)
+	if err != nil {
+		return nil, err
+	}
+	return root, nil
+}
+
+func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceProvider, builder valueBuilder, schema DadlSchema) error {
 
 	ctxByIndent := make([]*parseContext, 100)
-	ctx := &parseContext{parent: result.root}
+	ctx := &parseContext{schema: schema}
 
-	if p.schema != nil {
+	if schema != nil {
 		ctx.parentNodeInfo = &nodeInfo{
-			valueType: p.schema.getRoot(),
-			builder: &delegatedValueBuilder{
-				set: func(value interface{}) {
-					panic("not supported")
-				},
-				get: func() interface{} {
-					return result.root
-				},
-			},
+			valueType: schema.getRoot(),
+			builder:   builder,
 		}
 	}
 
@@ -79,9 +76,9 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
 			//	println("Process group:", line)
-			ctx, err = p.processGroup(line, result.root, resources)
+			ctx, err = p.processGroup(line, ctx, builder, resources)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			ctxByIndent = make([]*parseContext, 100)
 			ctxByIndent[0] = ctx
@@ -89,45 +86,39 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 			if strings.HasPrefix(line, "#") {
 				//	fmt.Println("skip comment:", line)
 			} else if strings.HasPrefix(line, "@") {
-				//		fmt.Println("magic ->", line)
-				err := p.parseMagic(ctx, line, resources)
+				err := p.parseMagic(ctx, builder, line, resources)
 				if err != nil {
-					return nil, err
+					return err
 				}
 			} else {
 				if indentWeight > ctx.indentWeight {
-					//		println("Indent found: " + line)
 					nextParentInfo := ctx.lastNodeInfo
 					ctx = &parseContext{
+						schema:         ctx.schema,
 						indentWeight:   indentWeight,
 						parentNodeInfo: nextParentInfo}
-					//		fmt.Printf("CTX[%v] -> %v\n", indentWeight, ctx)
 					ctxByIndent[indentWeight] = ctx
 				} else if indentWeight < ctx.indentWeight {
-					//		println("Find by indent: ", indentWeight)
 
 					for j := indentWeight; j >= 0; j-- {
 						if ctxByIndent[j] != nil {
-							//				println("Return by indent: ", j)
 							ctx = ctxByIndent[j]
 							break
 						}
 					}
-					//		fmt.Printf("CTX -> %+v\n", ctx)
 				}
 
-				// println("Parse line:", line)
 				ctx.lastNodeInfo, err = ctx.parentNodeInfo.valueType.parseChild(ctx.parentNodeInfo.builder, line)
 				if err != nil {
-					return nil, err
+					return err
 				}
 			}
 		}
 	}
-	return result.root, nil
+	return nil
 }
 
-func (p *Parser) processGroup(line string, tree map[string]interface{}, resources ResourceProvider) (*parseContext, error) {
+func (p *Parser) processGroup(line string, ctx *parseContext, rootBuilder valueBuilder, resources ResourceProvider) (*parseContext, error) {
 	//fmt.Println(line)
 	match := groupRe.FindStringSubmatch(line)
 	if match != nil {
@@ -139,17 +130,10 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 		}
 		treePath := result["treePath"]
 		importPath := result["importPath"]
-		if p.schema == nil {
+		if ctx.schema == nil {
 			return nil, errors.New("Missing schema info")
 		}
-		schemaNode, valueBuilder, err := p.schema.getNode(treePath, &delegatedValueBuilder{
-			set: func(value interface{}) {
-				panic("not supported")
-			},
-			get: func() interface{} {
-				return tree
-			},
-		})
+		schemaNode, valueBuilder, err := ctx.schema.getNode(treePath, rootBuilder)
 		if err != nil {
 			return nil, err
 		}
@@ -168,19 +152,15 @@ func (p *Parser) processGroup(line string, tree map[string]interface{}, resource
 				if err != nil {
 					return nil, err
 				}
-				valueBuilder.setValue(string(data))
+				valueBuilder.setSimpleValue(string(data))
 			} else {
-				parser := newParserWithSchema(&dadlSchemaImpl{root: schemaNode})
-				value, err := parser.Parse(file, resources)
+				err := p.ParseWithBuilderAndSchema(file, resources, valueBuilder, &dadlSchemaImpl{root: schemaNode})
 				if err != nil {
 					return nil, err
 				}
-				valueBuilder.setValue(value)
 			}
-
 		}
-
-		return &parseContext{parentNodeInfo: &nodeInfo{valueType: schemaNode, builder: valueBuilder}, indentWeight: 0}, nil
+		return &parseContext{schema: ctx.schema, parentNodeInfo: &nodeInfo{valueType: schemaNode, builder: valueBuilder}, indentWeight: 0}, nil
 	}
 	return nil, errors.New("Invalid group definition")
 }
@@ -194,32 +174,30 @@ func calcIndentWeight(line string) int {
 	return len(line)
 }
 
-func (p *Parser) parseMagic(ctx *parseContext, line string, resources ResourceProvider) error {
+func (p *Parser) parseMagic(ctx *parseContext, rootBuilder valueBuilder, line string, resources ResourceProvider) error {
 	if strings.HasPrefix(line, "@schema ") {
 		var err error
 		parts := strings.Split(line[8:], " ")
-		p.schema, err = parseSchema2(parts[0], resources)
+
+		if ctx.schema != nil {
+			//TODO compares chema
+			return nil
+		}
+
+		ctx.schema, err = parseSchema(parts[0], resources)
 		if err != nil {
 			return err
 		}
 
-		rootBuilder := &delegatedValueBuilder{
-			set: func(value interface{}) {
-				panic("not supported")
-			},
-			get: func() interface{} {
-				return ctx.parent
-			},
-		}
-
 		if len(parts) == 2 && strings.HasPrefix(parts[1], "[") && strings.HasSuffix(parts[1], "]") {
-			valueType, _, err := p.schema.getNode(parts[1][1:len(parts[1])-1], rootBuilder)
+			valueType, _, err := ctx.schema.getNode(parts[1][1:len(parts[1])-1], rootBuilder)
 			if err != nil {
 				return err
 			}
+			ctx.schema = &dadlSchemaImpl{root: valueType}
 			ctx.parentNodeInfo = &nodeInfo{valueType: valueType, builder: rootBuilder}
 		} else {
-			ctx.parentNodeInfo = &nodeInfo{valueType: p.schema.getRoot(), builder: rootBuilder}
+			ctx.parentNodeInfo = &nodeInfo{valueType: ctx.schema.getRoot(), builder: rootBuilder}
 		}
 		return nil
 	} else {
@@ -229,7 +207,7 @@ func (p *Parser) parseMagic(ctx *parseContext, line string, resources ResourcePr
 
 //Parser - parses DADL files
 type Parser struct {
-	schema DadlSchema
+	// schema DadlSchema
 }
 
 //Node alias for map of string to interface
