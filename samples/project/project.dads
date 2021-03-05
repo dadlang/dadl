@@ -3,7 +3,7 @@
 [types]
 typeDef complex
     text formula <type identifier> [' #' <desc string>]
-    structure list typeDef
+    structure map[string]typeDef
 httpMethod enum GET POST PUT PATCH DELETE
 path complex
     text string /.*
@@ -11,16 +11,12 @@ path complex
 operation formula <verb httpMethod> <interactor string>
 pathOrOperation oneof path operation
 
-fuckup complex
-    text string
-    structure list string
-
 [structure]
-fuckup fuckup
 name string
 codename string
 global
-    types list typeDef 
+    types map[string]typeDef
+    contexts map[string]map[string]typeDef
 
 modules map[string]
     name string
@@ -30,7 +26,7 @@ modules map[string]
     interactors map[string]
         name string
         type string
-        input list typeDef
-        output list typeDef
+        input map[string]typeDef
+        output map[string]typeDef
     transport
         rest list pathOrOperation

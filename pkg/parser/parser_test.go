@@ -183,4 +183,38 @@ echo "Hello Dadl!"`,
 			},
 		},
 	},
+
+	{
+		name:     "complex type test",
+		testFile: "complex_type/complex_type.dad",
+		expected: Node{
+			"sampleComplex": Node{
+				"value": Node{
+					"host": "root",
+					"port": 0,
+				},
+				"children": []interface{}{
+					Node{
+						"value": Node{
+							"host": "add1",
+							"port": 8080,
+						},
+						"children": Node{
+							"extra1": "hello",
+							"extra2": 5,
+						},
+					},
+					Node{
+						"value": Node{
+							"host": "add2",
+							"port": 8080,
+						},
+						"children": Node{
+							"extra2": 7,
+						},
+					},
+				},
+			},
+		},
+	},
 }

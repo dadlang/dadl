@@ -1,9 +1,5 @@
 @schema ./project.dads
 
-fuckup string
-    list value1
-    list value2
-
 name Online Boutique
 codename boutique
 
@@ -19,16 +15,16 @@ types
     Other String
 
 [global.types]
-UserId String
-ProductId String
+UserId String #User identifier
+ProductId String #Product identifier
 
 [modules.cart << ./modules/cart.dad]
 
-#[contexts]
-#user
-#    userID UserID #Identifier of the user
-#user2
-#    userID2_1 UserID #Identifier of the user
-#    userID2_2? UserID #Identifier of the user
-#user3
-#    userID3_1? UserID #Identifier of the user
+[global.contexts]
+user
+    userID UserID #Identifier of the user
+user2
+    userID2_1 UserID #Identifier of the user
+    userID2_2? UserID #Identifier of the user
+user3
+    userID3_1? UserID #Identifier of the user
