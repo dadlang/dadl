@@ -154,7 +154,7 @@ type constantValue struct {
 }
 
 func (v *constantValue) parse(builder valueBuilder, value string) error {
-	//do nothing
+	builder.setSimpleValue(value == v.value)
 	return nil
 }
 
@@ -589,11 +589,13 @@ func (v *structValue) supportsChildren() bool {
 }
 
 type oneofValueOption struct {
-	name      string
-	valueType valueType
+	Name      string
+	ValueType valueType
+	ValueKey  string
 }
 
 type oneofValue struct {
+	TypeKey string
 	options []oneofValueOption
 	_res    []*regexp.Regexp
 	// _optionsMap map[string]valueType
@@ -604,7 +606,7 @@ func (v *oneofValue) parse(builder valueBuilder, value string) error {
 	if len(v._res) == 0 {
 		v._res = make([]*regexp.Regexp, len(v.options))
 		for i, option := range v.options {
-			v._res[i] = regexp.MustCompile("^" + option.valueType.toRegex() + "$")
+			v._res[i] = regexp.MustCompile("^" + option.ValueType.toRegex() + "$")
 		}
 	}
 
@@ -615,10 +617,18 @@ func (v *oneofValue) parse(builder valueBuilder, value string) error {
 		match := re.FindStringSubmatch(trimmedValue)
 		if match != nil {
 			matchedOption := v.options[i]
-			optionName := matchedOption.name
+			optionName := matchedOption.Name
 			log.Println("oneofValue [match]:", optionName)
-			builder.getFieldBuilder("@type").setSimpleValue(optionName)
-			err := matchedOption.valueType.parse(builder.getFieldBuilder("value"), trimmedValue)
+			if v.TypeKey == "" {
+				builder.getFieldBuilder("@type").setSimpleValue(optionName)
+			} else {
+				builder.getFieldBuilder(v.TypeKey).setSimpleValue(optionName)
+			}
+			valueBuilder := builder
+			if matchedOption.ValueKey != "" {
+				valueBuilder = builder.getFieldBuilder(matchedOption.ValueKey)
+			}
+			err := matchedOption.ValueType.parse(valueBuilder, trimmedValue)
 			if err != nil {
 				return err
 			}
@@ -634,8 +644,13 @@ func (v *oneofValue) parseChild(builder valueBuilder, value string) (*nodeInfo, 
 
 	lastMatch := builder.getMeta("lastMatch")
 	if lastMatch != nil {
-		log.Println("oneofValue [lastOption]:", v.options[lastMatch.(int)].name)
-		return v.options[lastMatch.(int)].valueType.parseChild(builder.getFieldBuilder("value"), value)
+		lastOption := v.options[lastMatch.(int)]
+		log.Println("oneofValue [lastOption]:", lastOption.Name)
+		valueBuilder := builder
+		if lastOption.ValueKey != "" {
+			valueBuilder = builder.getFieldBuilder(lastOption.ValueKey)
+		}
+		return lastOption.ValueType.parseChild(valueBuilder, value)
 	}
 	return nil, errors.New("[oneofValue] Not supported")
 }
@@ -650,14 +665,14 @@ func (v *oneofValue) toRegex() string {
 		if sb.Len() > 0 {
 			sb.WriteString("|")
 		}
-		sb.WriteString("(?:" + option.valueType.toRegex() + ")")
+		sb.WriteString("(?:" + option.ValueType.toRegex() + ")")
 	}
 	return sb.String()
 }
 
 func (v *oneofValue) supportsChildren() bool {
 	for _, option := range v.options {
-		if option.valueType.supportsChildren() {
+		if option.ValueType.supportsChildren() {
 			return true
 		}
 	}
@@ -665,18 +680,33 @@ func (v *oneofValue) supportsChildren() bool {
 }
 
 type complexValue struct {
-	textValue   valueType
-	structValue valueType
+	textValue      valueType
+	textValueKey   string
+	structValue    valueType
+	structValueKey string
 }
 
 func (v *complexValue) parse(builder valueBuilder, value string) error {
 	log.Println("complexValue [parse]:", value)
-	return v.textValue.parse(builder.getFieldBuilder("value"), value)
+	if v.textValueKey == "" {
+		return v.textValue.parse(builder, value)
+	}
+	return v.textValue.parse(v.resolveBuilderFieldPath(builder, v.textValueKey), value)
+}
+
+func (v *complexValue) resolveBuilderFieldPath(builder valueBuilder, path string) valueBuilder {
+	for _, part := range strings.Split(path, ".") {
+		builder = builder.getFieldBuilder(part)
+	}
+	return builder
 }
 
 func (v *complexValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
 	log.Println("complexValue [parseChild]:", value)
-	return v.structValue.parseChild(builder.getFieldBuilder("children"), value)
+	if v.structValueKey == "" {
+		return v.structValue.parseChild(builder, value)
+	}
+	return v.structValue.parseChild(v.resolveBuilderFieldPath(builder, v.structValueKey), value)
 }
 
 func (v *complexValue) toRegex() string {

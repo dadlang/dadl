@@ -2,13 +2,15 @@
 
 [types]
 address formula <host identifier> ':' <port int>
-addressExtra complex
-    text address
-    structure
-        extra1 string
-        extra2 int
+addressExtra complex[address]
+    extra1 string
+    extra2 int
+addressExtraSpread complex[...address]...
+    extra1 string
+    extra2 int
+
+
 
 [structure]
-sampleComplex complex
-    text address
-    structure list addressExtra
+sampleComplex complex[address]list addressExtra
+sampleComplexSpread complex[...address]list addressExtraSpread

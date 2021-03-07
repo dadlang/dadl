@@ -52,6 +52,7 @@ func GetDadlSchema() DadlSchema {
 			keyType:   keyType,
 			valueType: typeDef,
 		},
+		structValueKey: "children",
 	}
 	stringDef := &formulaValue{
 		formula: []formulaItem{
@@ -148,12 +149,13 @@ func GetDadlSchema() DadlSchema {
 	formulaItemDef := &oneofValue{
 		options: []oneofValueOption{
 			{
-				name:      "formulaItemConstant",
-				valueType: &stringValue{regex: "'.*?'"},
+				Name:      "formulaItemConstant",
+				ValueType: &stringValue{regex: "'.*?'"},
+				ValueKey:  "value",
 			},
 			{
-				name: "formulaItemVariable",
-				valueType: &formulaValue{
+				Name: "formulaItemVariable",
+				ValueType: &formulaValue{
 					formula: []formulaItem{
 
 						{
@@ -177,8 +179,8 @@ func GetDadlSchema() DadlSchema {
 				},
 			},
 			{
-				name: "formulaItemOptional",
-				valueType: &formulaValue{
+				Name: "formulaItemOptional",
+				ValueType: &formulaValue{
 					formula: []formulaItem{
 
 						{
@@ -268,6 +270,7 @@ func GetDadlSchema() DadlSchema {
 			keyType:   keyType,
 			valueType: typeDef,
 		},
+		structValueKey: "valueType.children",
 	}
 	customTypeRef := &formulaValue{
 		formula: []formulaItem{
@@ -299,71 +302,95 @@ func GetDadlSchema() DadlSchema {
 				{
 					valueType: &stringValue{regex: "complex"},
 				},
+				{
+					valueType: &constantValue{value: "["},
+				},
+				{
+					name:      "spreadValue",
+					optional:  true,
+					valueType: &constantValue{value: "..."},
+				},
+				{
+					name:      "valueType",
+					valueType: &delegatedValue{target: typeDef},
+				},
+				{
+					valueType: &constantValue{value: "]"},
+				},
+				{
+					name:      "spreadChildren",
+					optional:  true,
+					valueType: &constantValue{value: "..."},
+				},
+				{
+					name:      "childType",
+					valueType: &delegatedValue{target: typeDef},
+				},
 			},
 		},
-		structValue: &structValue{
-			children: map[string]valueType{
-				"text":      typeDef,
-				"structure": typeDef,
-			},
+		textValueKey: "",
+		structValue: &mapValue{
+			keyType:   keyType,
+			valueType: typeDef,
 		},
+		structValueKey: "childType.children",
 	}
 	typeDef.options = []oneofValueOption{
 		{
-			name:      "stringDef",
-			valueType: stringDef,
+			Name:      "stringDef",
+			ValueType: stringDef,
 		},
 		{
-			name:      "identifierDef",
-			valueType: identifierDef,
+			Name:      "identifierDef",
+			ValueType: identifierDef,
 		},
 		{
-			name:      "intDef",
-			valueType: intDef,
+			Name:      "intDef",
+			ValueType: intDef,
 		},
 		{
-			name:      "boolDef",
-			valueType: boolDef,
+			Name:      "boolDef",
+			ValueType: boolDef,
 		},
 		{
-			name:      "numberDef",
-			valueType: numberDef,
+			Name:      "numberDef",
+			ValueType: numberDef,
 		},
 		{
-			name:      "enumDef",
-			valueType: enumDef,
+			Name:      "enumDef",
+			ValueType: enumDef,
 		},
 		{
-			name:      "formulaDef",
-			valueType: formulaDef,
+			Name:      "formulaDef",
+			ValueType: formulaDef,
 		},
 		{
-			name:      "sequenceDef",
-			valueType: sequenceDef,
+			Name:      "sequenceDef",
+			ValueType: sequenceDef,
 		},
 		{
-			name:      "listDef",
-			valueType: listDef,
+			Name:      "listDef",
+			ValueType: listDef,
 		},
 		{
-			name:      "mapDef",
-			valueType: mapDef,
+			Name:      "mapDef",
+			ValueType: mapDef,
 		},
 		{
-			name:      "structDef",
-			valueType: structType,
+			Name:      "structDef",
+			ValueType: structType,
 		},
 		{
-			name:      "oneofDef",
-			valueType: oneofDef,
+			Name:      "oneofDef",
+			ValueType: oneofDef,
 		},
 		{
-			name:      "complexDef",
-			valueType: complexDef,
+			Name:      "complexDef",
+			ValueType: complexDef,
 		},
 		{
-			name:      "customTypeRef",
-			valueType: customTypeRef,
+			Name:      "customTypeRef",
+			ValueType: customTypeRef,
 		},
 	}
 	typesDef := &mapValue{
@@ -393,21 +420,19 @@ func mapFormulaItem(data map[string]interface{}) (abstractFormulaItem, error) {
 	var result interface{}
 	switch option {
 	case "formulaItemVariable":
-		value := data["value"].(map[string]interface{})
-		mappedType, err := mapType(value["type"].(map[string]interface{}))
+		mappedType, err := mapType(data["type"].(map[string]interface{}))
 		if err != nil {
 			return nil, err
 		}
 		result = &formulaItemVariable{
-			Name: value["name"].(string),
+			Name: data["name"].(string),
 			Type: mappedType,
 		}
 	case "formulaItemConstant":
 		result = &formulaItemConstant{Value: strings.Trim(data["value"].(string), "'")}
 	case "formulaItemOptional":
 		var err error
-		value := data["value"].(map[string]interface{})
-		itemsDef := value["items"].([]interface{})
+		itemsDef := data["items"].([]interface{})
 		items := make([]abstractFormulaItem, len(itemsDef))
 		for i, item := range itemsDef {
 			items[i], err = mapFormulaItem(item.(map[string]interface{}))
@@ -449,15 +474,11 @@ func mapType(data map[string]interface{}) (abstractTypeDef, error) {
 	case "oneofDef":
 		result = &oneofTypeDef{}
 	case "mapDef":
-		keyType, err := mapType(data["value"].(map[string]interface{})["value"].(map[string]interface{})["keyType"].(map[string]interface{}))
+		keyType, err := mapType(data["keyType"].(map[string]interface{}))
 		if err != nil {
 			return nil, err
 		}
-		valueTypeDef := data["value"].(map[string]interface{})["value"].(map[string]interface{})["valueType"].(map[string]interface{})
-		//TODO fix hack
-		if valueTypeDef["@type"] == "structDef" {
-			valueTypeDef["value"].(map[string]interface{})["children"] = data["value"].(map[string]interface{})["children"]
-		}
+		valueTypeDef := data["valueType"].(map[string]interface{})
 		valueType, err := mapType(valueTypeDef)
 		if err != nil {
 			return nil, err
@@ -468,7 +489,7 @@ func mapType(data map[string]interface{}) (abstractTypeDef, error) {
 		}, nil
 	case "structDef":
 		structure := &structTypeDef{Children: map[string]abstractTypeDef{}}
-		if children, ok := data["value"].(map[string]interface{})["children"]; ok && children != nil {
+		if children, ok := data["children"]; ok && children != nil {
 			for key, value := range children.(map[string]interface{}) {
 				childType, err := mapType(value.(map[string]interface{}))
 				if err != nil {
@@ -479,16 +500,17 @@ func mapType(data map[string]interface{}) (abstractTypeDef, error) {
 		}
 		return structure, nil
 	case "complexDef":
-		children := data["value"].(map[string]interface{})["children"].(map[string]interface{})
-		textType, err := mapType(children["text"].(map[string]interface{}))
+		valueType, err := mapType(data["valueType"].(map[string]interface{}))
 		if err != nil {
 			return nil, err
 		}
-		structureType, err := mapType(children["structure"].(map[string]interface{}))
+		childType, err := mapType(data["childType"].(map[string]interface{}))
 		if err != nil {
 			return nil, err
 		}
-		return &complexTypeDef{textType, structureType}, nil
+		spreadValue := data["spreadValue"] == true
+		spreadChildren := data["spreadChildren"] == true
+		return &complexTypeDef{valueType, childType, spreadValue, spreadChildren}, nil
 	default:
 		return nil, errors.New("Unknown option: " + option)
 	}
@@ -499,7 +521,7 @@ func mapType(data map[string]interface{}) (abstractTypeDef, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = decoder.Decode(data["value"])
+	err = decoder.Decode(data)
 	if err != nil {
 		return nil, err
 	}
@@ -591,12 +613,15 @@ type formulaTypeDef struct {
 }
 
 type oneofTypeDef struct {
-	Options []string
+	Options     []string
+	SpreadValue bool
 }
 
 type complexTypeDef struct {
-	TextType      abstractTypeDef
-	StructureType abstractTypeDef
+	ValueType      abstractTypeDef
+	ChildType      abstractTypeDef
+	SpreadValue    bool
+	SpreadChildren bool
 }
 
 type enumTypeDef struct {

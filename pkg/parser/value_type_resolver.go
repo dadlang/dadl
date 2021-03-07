@@ -115,19 +115,27 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 			if err != nil {
 				return nil, err
 			}
-			options[i] = oneofValueOption{name: typeName, valueType: valueType}
+			options[i] = oneofValueOption{Name: typeName, ValueType: valueType}
 		}
 		return &oneofValue{options: options}, nil
 	case *complexTypeDef:
-		textType, err := r.buildType(typeDef.(*complexTypeDef).TextType)
+		textType, err := r.buildType(typeDef.(*complexTypeDef).ValueType)
 		if err != nil {
 			return nil, err
 		}
-		structureType, err := r.buildType(typeDef.(*complexTypeDef).StructureType)
+		structureType, err := r.buildType(typeDef.(*complexTypeDef).ChildType)
 		if err != nil {
 			return nil, err
 		}
-		return &complexValue{textValue: textType, structValue: structureType}, nil
+		textValueKey := "value"
+		if typeDef.(*complexTypeDef).SpreadValue {
+			textValueKey = ""
+		}
+		structValueKey := "children"
+		if typeDef.(*complexTypeDef).SpreadChildren {
+			structValueKey = ""
+		}
+		return &complexValue{textValue: textType, structValue: structureType, textValueKey: textValueKey, structValueKey: structValueKey}, nil
 	case *customTypeRef:
 		return r.resolveType(typeDef.(*customTypeRef).TypeName)
 	}
