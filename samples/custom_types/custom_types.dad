@@ -1,6 +1,6 @@
 @schema custom_types.dads
 
-sampleInlineEnum OK
+sampleBoolEnum OK
 sampleEnum GET
 sampleHostname node1
 samplePort 9042

@@ -9,8 +9,6 @@ addressExtraSpread complex[...address]...
     extra1 string
     extra2 int
 
-
-
 [structure]
-sampleComplex complex[address]list addressExtra
-sampleComplexSpread complex[...address]list addressExtraSpread
+sampleComplex complex[address]list[addressExtra]
+sampleComplexSpread complex[...address]list[addressExtraSpread]

@@ -19,27 +19,29 @@ func GetDadlSchema() DadlSchema {
 	keyType := &stringValue{regex: "[A-Za-z0-9-_]+"}
 	whitespace := &stringValue{regex: "\\s+"}
 	typeDef := &oneofValue{}
-	// typeDef := &formulaValue{
-	// 	formula: []formulaItem{
-	// 		{
-	// 			name:      "typeDef",
-	// 			valueType: anyType,
-	// 		},
-	// 		{
-	// 			optional:  true,
-	// 			composite: true,
-	// 			children: []formulaItem{
-	// 				{
-	// 					valueType: &stringValue{regex: "\\s*#"},
-	// 				},
-	// 				{
-	// 					name:      "comment",
-	// 					valueType: &stringValue{},
-	// 				},
-	// 			},
-	// 		},
-	// 	},
-	// }
+	textualTypeDef := &oneofValue{}
+	typeWithCommentDef := &formulaValue{
+		formula: []formulaItem{
+			{
+				spread:       true,
+				valueType:    typeDef,
+				asStructType: true,
+			},
+			{
+				optional:  true,
+				composite: true,
+				children: []formulaItem{
+					{
+						valueType: &stringValue{regex: "\\s*#"},
+					},
+					{
+						name:      "comment",
+						valueType: &stringValue{},
+					},
+				},
+			},
+		},
+	}
 	structType := &complexValue{
 		textValue: &formulaValue{
 			formula: []formulaItem{
@@ -98,22 +100,6 @@ func GetDadlSchema() DadlSchema {
 					},
 				},
 			},
-			//TODO move comment somwhere else
-			{
-				optional:  true,
-				composite: true,
-				children: []formulaItem{
-					{
-						valueType: whitespace,
-					},
-					{
-						valueType: &constantValue{value: "#"},
-					},
-					{
-						valueType: &stringValue{},
-					},
-				},
-			},
 		},
 	}
 	boolDef := &formulaValue{
@@ -136,11 +122,51 @@ func GetDadlSchema() DadlSchema {
 				valueType: &stringValue{regex: "enum"},
 			},
 			{
+				optional:  true,
+				composite: true,
+				children: []formulaItem{
+					{
+						valueType: &constantValue{value: "["},
+					},
+					{
+						name:      "valueType",
+						valueType: &delegatedValue{target: textualTypeDef},
+					},
+					{
+						valueType: &constantValue{value: "]"},
+					},
+				},
+			},
+			{
 				valueType: whitespace,
 			},
 			{
+				name: "values",
 				valueType: &sequenceValue{
-					itemType: &stringValue{regex: regexIdentifier},
+					itemType: &formulaValue{
+						formula: []formulaItem{
+							{
+								name:      "textValue",
+								valueType: &stringValue{regex: regexIdentifier},
+							},
+							{
+								optional:  true,
+								composite: true,
+								children: []formulaItem{
+									{
+										valueType: &constantValue{value: "["},
+									},
+									{
+										name:      "mappedValue",
+										valueType: &stringValue{},
+									},
+									{
+										valueType: &constantValue{value: "]"},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -170,7 +196,7 @@ func GetDadlSchema() DadlSchema {
 						},
 						{
 							name:      "type",
-							valueType: &delegatedValue{target: typeDef},
+							valueType: &delegatedValue{target: textualTypeDef},
 						},
 						{
 							valueType: &constantValue{value: ">"},
@@ -182,7 +208,6 @@ func GetDadlSchema() DadlSchema {
 				Name: "formulaItemOptional",
 				ValueType: &formulaValue{
 					formula: []formulaItem{
-
 						{
 							valueType: &constantValue{value: "["},
 						},
@@ -221,11 +246,14 @@ func GetDadlSchema() DadlSchema {
 				valueType: &stringValue{regex: "sequence"},
 			},
 			{
-				valueType: whitespace,
+				valueType: &constantValue{value: "["},
 			},
 			{
 				name:      "itemType",
 				valueType: &delegatedValue{target: typeDef},
+			},
+			{
+				valueType: &constantValue{value: "]"},
 			},
 		},
 	}
@@ -235,11 +263,14 @@ func GetDadlSchema() DadlSchema {
 				valueType: &stringValue{regex: "list"},
 			},
 			{
-				valueType: whitespace,
+				valueType: &constantValue{value: "["},
 			},
 			{
 				name:      "itemType",
 				valueType: &delegatedValue{target: typeDef},
+			},
+			{
+				valueType: &constantValue{value: "]"},
 			},
 		},
 	}
@@ -335,6 +366,44 @@ func GetDadlSchema() DadlSchema {
 		},
 		structValueKey: "childType.children",
 	}
+	textualTypeDef.options = []oneofValueOption{
+		{
+			Name:      "stringDef",
+			ValueType: stringDef,
+		},
+		{
+			Name:      "identifierDef",
+			ValueType: identifierDef,
+		},
+		{
+			Name:      "intDef",
+			ValueType: intDef,
+		},
+		{
+			Name:      "boolDef",
+			ValueType: boolDef,
+		},
+		{
+			Name:      "numberDef",
+			ValueType: numberDef,
+		},
+		{
+			Name:      "enumDef",
+			ValueType: enumDef,
+		},
+		{
+			Name:      "formulaDef",
+			ValueType: formulaDef,
+		},
+		{
+			Name:      "sequenceDef",
+			ValueType: sequenceDef,
+		},
+		{
+			Name:      "customTypeRef",
+			ValueType: customTypeRef,
+		},
+	}
 	typeDef.options = []oneofValueOption{
 		{
 			Name:      "stringDef",
@@ -395,7 +464,7 @@ func GetDadlSchema() DadlSchema {
 	}
 	typesDef := &mapValue{
 		keyType:   keyType,
-		valueType: typeDef,
+		valueType: typeWithCommentDef,
 	}
 
 	return &dadlSchemaImpl{root: &structValue{
@@ -625,8 +694,15 @@ type complexTypeDef struct {
 }
 
 type enumTypeDef struct {
-	Values []string
+	ValueType abstractTypeDef
+	Values    []enumTypeValueDef
 }
+
+type enumTypeValueDef struct {
+	TextValue   string
+	MappedValue string
+}
+
 type mapTypeDef struct {
 	KeyType   abstractTypeDef
 	ValueType abstractTypeDef

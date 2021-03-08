@@ -180,6 +180,7 @@ type intValue struct {
 }
 
 func (v *intValue) parse(builder valueBuilder, value string) error {
+	log.Println("intValue [parse]:", value)
 	intValue, err := strconv.Atoi(value)
 	if err != nil {
 		return err
@@ -189,6 +190,7 @@ func (v *intValue) parse(builder valueBuilder, value string) error {
 }
 
 func (v *intValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
+	log.Println("intValue [parseChild]:", value)
 	return nil, errors.New("not supported")
 }
 
@@ -231,12 +233,17 @@ func (v *numberValue) supportsChildren() bool {
 }
 
 type enumValue struct {
-	values map[string]bool
+	valueType valueType
+	values    map[string]string
 }
 
 func (v *enumValue) parse(builder valueBuilder, value string) error {
-	builder.setSimpleValue(strings.TrimSpace(value))
-	return nil
+	mappedValue, ok := v.values[value]
+	if ok {
+		return v.valueType.parse(builder, mappedValue)
+	} else {
+		return errors.New("Unsupported enum value: " + value)
+	}
 }
 
 func (v *enumValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
@@ -256,25 +263,31 @@ func (v *enumValue) supportsChildren() bool {
 }
 
 type formulaItem struct {
-	name      string
-	valueType valueType
-	optional  bool
-	composite bool
-	children  []formulaItem
+	name         string
+	spread       bool
+	valueType    valueType
+	optional     bool
+	composite    bool
+	children     []formulaItem
+	asStructType bool
 }
 
 type formulaValue struct {
-	formula  []formulaItem
-	_re      *regexp.Regexp
-	_mapping []formulaItem
+	formula     []formulaItem
+	_re         *regexp.Regexp
+	_mapping    []formulaItem
+	_structType valueType
 }
 
-func buildMapping(mapping *[]formulaItem, items []formulaItem) {
+func buildMapping(mapping *[]formulaItem, items []formulaItem, structType *valueType) {
 	for _, item := range items {
 		if item.composite {
-			buildMapping(mapping, item.children)
-		} else if item.name != "" {
+			buildMapping(mapping, item.children, structType)
+		} else if item.name != "" || item.spread {
 			*mapping = append(*mapping, item)
+			if item.asStructType {
+				*structType = item.valueType
+			}
 		}
 	}
 }
@@ -288,7 +301,7 @@ func (v *formulaValue) initIfRequired() error {
 		log.Println("formulaValue [regex]:", sb.String())
 		v._re = regexp.MustCompile(sb.String())
 		v._mapping = []formulaItem{}
-		buildMapping(&v._mapping, v.formula)
+		buildMapping(&v._mapping, v.formula, &v._structType)
 	}
 	return nil
 }
@@ -296,11 +309,22 @@ func (v *formulaValue) initIfRequired() error {
 func (v *formulaValue) parse(builder valueBuilder, value string) error {
 	log.Println("formulaValue [parse]:", value)
 	v.initIfRequired()
-	match := v._re.FindStringSubmatch(strings.TrimSpace(value))
+	valueToParse := strings.TrimSpace(value)
+	match := v._re.FindStringSubmatchIndex(valueToParse)
 	if match != nil {
-		for i, matchValue := range match[1:] {
-			item := v._mapping[i]
-			err := item.valueType.parse(builder.getFieldBuilder(item.name), matchValue)
+		for i, item := range v._mapping {
+			itemIdxFrom := i*2 + 2
+			if match[itemIdxFrom] < 0 {
+				continue
+			}
+			matchValue := valueToParse[match[itemIdxFrom]:match[itemIdxFrom+1]]
+			var newBuilder valueBuilder
+			if item.spread {
+				newBuilder = builder
+			} else {
+				newBuilder = builder.getFieldBuilder(item.name)
+			}
+			err := item.valueType.parse(newBuilder, matchValue)
 			if err != nil {
 				return err
 			}
@@ -312,6 +336,10 @@ func (v *formulaValue) parse(builder valueBuilder, value string) error {
 }
 
 func (v *formulaValue) parseChild(builder valueBuilder, value string) (*nodeInfo, error) {
+	v.initIfRequired()
+	if v._structType != nil {
+		return v._structType.parseChild(builder, value)
+	}
 	return nil, errors.New("[formulaValue] Not supported: parseChild")
 }
 
@@ -338,7 +366,7 @@ func buildItemRegex(item formulaItem, capture bool) string {
 		sb.WriteString(buildItemsRegex(item.children, capture))
 		sb.WriteString(")")
 	} else {
-		if !capture || item.name == "" {
+		if !capture || (item.name == "" && !item.spread) {
 			sb.WriteString("(?:" + item.valueType.toRegex() + ")")
 		} else {
 			sb.WriteString("(" + item.valueType.toRegex() + ")")

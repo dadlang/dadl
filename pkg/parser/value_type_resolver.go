@@ -57,9 +57,23 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 	case *boolTypeDef:
 		return &boolValue{}, nil
 	case *enumTypeDef:
-		enumValue := &enumValue{values: map[string]bool{}}
+		var valueType valueType
+		var err error
+		if typeDef.(*enumTypeDef).ValueType != nil {
+			valueType, err = r.buildType(typeDef.(*enumTypeDef).ValueType)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			valueType = &stringValue{}
+		}
+		enumValue := &enumValue{values: map[string]string{}, valueType: valueType}
 		for _, value := range typeDef.(*enumTypeDef).Values {
-			enumValue.values[value] = true
+			if value.MappedValue != "" {
+				enumValue.values[value.TextValue] = value.MappedValue
+			} else {
+				enumValue.values[value.TextValue] = value.TextValue
+			}
 		}
 		return enumValue, nil
 	case *formulaTypeDef:

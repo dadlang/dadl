@@ -1,14 +1,14 @@
 @schema dadl 0.1
 
 [types]
-httpVerb enum GET POST PUT PATCH DELETE
-hostname string [A-Za-z0-9-_.]+
+httpVerb enum GET POST PUT PATCH DELETE #Enum comment
+hostname string [A-Za-z0-9-_.]+ #String comment
 networkPort int 0..65535 #Network port number
 address formula <host hostname> ':' <port networkPort>
-addresses sequence address
+addresses sequence[address]
 
 [structure]
-sampleInlineEnum enum OK CANCEL
+sampleBoolEnum enum[bool] OK[true] CANCEL[false]
 sampleEnum httpVerb
 sampleHostname hostname
 samplePort networkPort
