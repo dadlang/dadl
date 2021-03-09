@@ -1,13 +1,9 @@
 @schema dadl 0.1
 
 [types]
-typeDef complex
-    text formula <type identifier> [' #' <desc string>]
-    structure map[string]typeDef
+typeDef complex[...formula <type identifier> [' #' <desc string>]]map[string]typeDef
 httpMethod enum GET POST PUT PATCH DELETE
-path complex
-    text string /.*
-    structure list pathOrOperation
+path complex[string `/.*`]list[pathOrOperation]
 operation formula <verb httpMethod> <interactor string>
 pathOrOperation oneof path operation
 
@@ -29,4 +25,4 @@ modules map[string]
         input map[string]typeDef
         output map[string]typeDef
     transport
-        rest list pathOrOperation
+        rest list[pathOrOperation]

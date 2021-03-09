@@ -36,11 +36,8 @@ input
 
 [transport.rest]
 /v1
-/v2
-    /first
-#    GET GetCart
-#    /cart
-#        GET GetCart
-#        DELETE EmptyCart
-#        /add
-#            POST AddItem
+    /cart
+        GET GetCart
+        DELETE EmptyCart
+        /add
+            POST AddItem

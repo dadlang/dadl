@@ -69,8 +69,14 @@ func GetDadlSchema() DadlSchema {
 						valueType: whitespace,
 					},
 					{
+						valueType: &constantValue{value: "`"},
+					},
+					{
 						name:      "regex",
-						valueType: &stringValue{regex: "\\S+"},
+						valueType: &stringValue{regex: ".*?"},
+					},
+					{
+						valueType: &constantValue{value: "`"},
 					},
 				},
 			},
@@ -130,7 +136,7 @@ func GetDadlSchema() DadlSchema {
 					},
 					{
 						name:      "valueType",
-						valueType: &delegatedValue{target: textualTypeDef},
+						valueType: textualTypeDef,
 					},
 					{
 						valueType: &constantValue{value: "]"},
@@ -196,7 +202,7 @@ func GetDadlSchema() DadlSchema {
 						},
 						{
 							name:      "type",
-							valueType: &delegatedValue{target: textualTypeDef},
+							valueType: typeDef,
 						},
 						{
 							valueType: &constantValue{value: ">"},
@@ -250,7 +256,7 @@ func GetDadlSchema() DadlSchema {
 			},
 			{
 				name:      "itemType",
-				valueType: &delegatedValue{target: typeDef},
+				valueType: typeDef,
 			},
 			{
 				valueType: &constantValue{value: "]"},
@@ -267,7 +273,7 @@ func GetDadlSchema() DadlSchema {
 			},
 			{
 				name:      "itemType",
-				valueType: &delegatedValue{target: typeDef},
+				valueType: typeDef,
 			},
 			{
 				valueType: &constantValue{value: "]"},
@@ -285,7 +291,7 @@ func GetDadlSchema() DadlSchema {
 				},
 				{
 					name:      "keyType",
-					valueType: &delegatedValue{target: typeDef},
+					valueType: typeDef,
 				},
 				{
 					valueType: &constantValue{value: "]"},
@@ -293,7 +299,7 @@ func GetDadlSchema() DadlSchema {
 				{
 					optional:  true,
 					name:      "valueType",
-					valueType: &delegatedValue{target: typeDef},
+					valueType: typeDef,
 				},
 			},
 		},
@@ -343,7 +349,7 @@ func GetDadlSchema() DadlSchema {
 				},
 				{
 					name:      "valueType",
-					valueType: &delegatedValue{target: typeDef},
+					valueType: typeDef,
 				},
 				{
 					valueType: &constantValue{value: "]"},
@@ -355,7 +361,7 @@ func GetDadlSchema() DadlSchema {
 				},
 				{
 					name:      "childType",
-					valueType: &delegatedValue{target: typeDef},
+					valueType: typeDef,
 				},
 			},
 		},

@@ -9,8 +9,12 @@ import (
 	"strings"
 )
 
+type regexBuildContext struct {
+	usage map[valueType]int
+}
+
 type valueType interface {
-	toRegex() string
+	toRegex(ctx regexBuildContext) string
 	parse(builder valueBuilder, value string) error
 	parseChild(builder valueBuilder, value string) (*nodeInfo, error)
 	getChild(name string, builder valueBuilder) (valueType, valueBuilder, error)
@@ -106,7 +110,7 @@ func (v *stringValue) parseChild(builder valueBuilder, value string) (*nodeInfo,
 	return &nodeInfo{valueType: v, builder: builder}, nil
 }
 
-func (v *stringValue) toRegex() string {
+func (v *stringValue) toRegex(ctx regexBuildContext) string {
 	if v.regex != "" {
 		return v.regex
 	}
@@ -141,7 +145,7 @@ func (v *boolValue) getChild(name string, builder valueBuilder) (valueType, valu
 	return nil, nil, errors.New("Not supported")
 }
 
-func (v *boolValue) toRegex() string {
+func (v *boolValue) toRegex(ctx regexBuildContext) string {
 	return "(?:true)|(?:false)"
 }
 
@@ -166,7 +170,7 @@ func (v *constantValue) getChild(name string, builder valueBuilder) (valueType, 
 	return nil, nil, errors.New("Not supported")
 }
 
-func (v *constantValue) toRegex() string {
+func (v *constantValue) toRegex(ctx regexBuildContext) string {
 	return regexp.QuoteMeta(v.value)
 }
 
@@ -198,7 +202,7 @@ func (v *intValue) getChild(name string, builder valueBuilder) (valueType, value
 	return nil, nil, errors.New("not supported")
 }
 
-func (v *intValue) toRegex() string {
+func (v *intValue) toRegex(ctx regexBuildContext) string {
 	return "(?:-)?\\d+"
 }
 
@@ -224,7 +228,7 @@ func (v *numberValue) getChild(name string, builder valueBuilder) (valueType, va
 	return nil, nil, errors.New("Not supported")
 }
 
-func (v *numberValue) toRegex() string {
+func (v *numberValue) toRegex(ctx regexBuildContext) string {
 	return "-?(?:\\d+)|(?:\\d*\\.\\d+)"
 }
 
@@ -254,7 +258,7 @@ func (v *enumValue) getChild(name string, builder valueBuilder) (valueType, valu
 	return nil, nil, errors.New("Not supported")
 }
 
-func (v *enumValue) toRegex() string {
+func (v *enumValue) toRegex(ctx regexBuildContext) string {
 	return "\\S+"
 }
 
@@ -296,7 +300,7 @@ func (v *formulaValue) initIfRequired() error {
 	if v._re == nil {
 		var sb strings.Builder
 		sb.WriteString("^")
-		sb.WriteString(buildItemsRegex(v.formula, true))
+		sb.WriteString(buildItemsRegex(v.formula, true, newRegexBuildContext()))
 		sb.WriteString("$")
 		log.Println("formulaValue [regex]:", sb.String())
 		v._re = regexp.MustCompile(sb.String())
@@ -347,29 +351,33 @@ func (v *formulaValue) getChild(name string, builder valueBuilder) (valueType, v
 	return nil, nil, errors.New("[formulaValue] Not supported: getChild")
 }
 
-func (v *formulaValue) toRegex() string {
-	return buildItemsRegex(v.formula, false)
+func (v *formulaValue) toRegex(ctx regexBuildContext) string {
+	nextCtx, result := ctx.With(v)
+	if nextCtx == nil {
+		return result
+	}
+	return buildItemsRegex(v.formula, false, *nextCtx)
 }
 
-func buildItemsRegex(items []formulaItem, nonCapture bool) string {
+func buildItemsRegex(items []formulaItem, nonCapture bool, ctx regexBuildContext) string {
 	var sb strings.Builder
 	for _, token := range items {
-		sb.WriteString(buildItemRegex(token, nonCapture))
+		sb.WriteString(buildItemRegex(token, nonCapture, ctx))
 	}
 	return sb.String()
 }
 
-func buildItemRegex(item formulaItem, capture bool) string {
+func buildItemRegex(item formulaItem, capture bool, ctx regexBuildContext) string {
 	var sb strings.Builder
 	if item.composite {
 		sb.WriteString("(?:")
-		sb.WriteString(buildItemsRegex(item.children, capture))
+		sb.WriteString(buildItemsRegex(item.children, capture, ctx))
 		sb.WriteString(")")
 	} else {
 		if !capture || (item.name == "" && !item.spread) {
-			sb.WriteString("(?:" + item.valueType.toRegex() + ")")
+			sb.WriteString("(?:" + item.valueType.toRegex(ctx) + ")")
 		} else {
-			sb.WriteString("(" + item.valueType.toRegex() + ")")
+			sb.WriteString("(" + item.valueType.toRegex(ctx) + ")")
 		}
 	}
 	if item.optional {
@@ -395,7 +403,8 @@ func (v *sequenceValue) parse(builder valueBuilder, value string) error {
 		if sep == "" {
 			sep = "\\s"
 		}
-		re := "^(" + v.itemType.toRegex() + ")(?:(?:" + sep + ")((?:" + v.itemType.toRegex() + ")(?:(?:" + sep + ")(?:" + v.itemType.toRegex() + "))*))?$"
+		ctx := newRegexBuildContext()
+		re := "^(" + v.itemType.toRegex(ctx) + ")(?:(?:" + sep + ")((?:" + v.itemType.toRegex(ctx) + ")(?:(?:" + sep + ")(?:" + v.itemType.toRegex(ctx) + "))*))?$"
 		log.Println("sequenceValue [regex]:", re)
 		v.re = regexp.MustCompile(re)
 	}
@@ -430,12 +439,16 @@ func (v *sequenceValue) getChild(name string, builder valueBuilder) (valueType, 
 	return nil, nil, errors.New("[sequenceValue] Not supported")
 }
 
-func (v *sequenceValue) toRegex() string {
+func (v *sequenceValue) toRegex(ctx regexBuildContext) string {
+	nextCtx, result := ctx.With(v)
+	if nextCtx == nil {
+		return result
+	}
 	sep := v.separator
 	if sep == "" {
 		sep = "\\s"
 	}
-	return "(?:" + v.itemType.toRegex() + ")(?:" + sep + "(?:" + v.itemType.toRegex() + "))*"
+	return "(?:" + v.itemType.toRegex(*nextCtx) + ")(?:" + sep + "(?:" + v.itemType.toRegex(*nextCtx) + "))*"
 }
 
 func (v *sequenceValue) supportsChildren() bool {
@@ -460,7 +473,7 @@ func (v *binaryValue) getChild(name string, builder valueBuilder) (valueType, va
 	return nil, nil, errors.New("Not supported")
 }
 
-func (v *binaryValue) toRegex() string {
+func (v *binaryValue) toRegex(ctx regexBuildContext) string {
 	return ".*"
 }
 
@@ -492,7 +505,7 @@ func (v *listValue) parseChild(builder valueBuilder, value string) (*nodeInfo, e
 	}, nil
 }
 
-func (v *listValue) toRegex() string {
+func (v *listValue) toRegex(ctx regexBuildContext) string {
 	return ""
 }
 
@@ -542,16 +555,15 @@ func (v *mapValue) parseChild(builder valueBuilder, value string) (*nodeInfo, er
 	}, nil
 }
 
-func (v *mapValue) toRegex() string {
-	//TODO
-	return v.keyType.toRegex()
+func (v *mapValue) toRegex(ctx regexBuildContext) string {
+	nextCtx, result := ctx.With(v)
+	if nextCtx == nil {
+		return result
+	}
+	return v.keyType.toRegex(*nextCtx)
 }
 
 func (v *mapValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
-	// if builder.getValue() == nil {
-	// 	builder.setValue(map[string]interface{}{})
-	// }
-
 	return v.valueType, builder.getFieldBuilder(name), nil
 }
 
@@ -601,7 +613,7 @@ func (v *structValue) parseChild(builder valueBuilder, value string) (*nodeInfo,
 	return nil, errors.New("No child with name: " + key)
 }
 
-func (v *structValue) toRegex() string {
+func (v *structValue) toRegex(ctx regexBuildContext) string {
 	return ""
 }
 
@@ -634,7 +646,7 @@ func (v *oneofValue) parse(builder valueBuilder, value string) error {
 	if len(v._res) == 0 {
 		v._res = make([]*regexp.Regexp, len(v.options))
 		for i, option := range v.options {
-			v._res[i] = regexp.MustCompile("^" + option.ValueType.toRegex() + "$")
+			v._res[i] = regexp.MustCompile("^" + option.ValueType.toRegex(newRegexBuildContext()) + "$")
 		}
 	}
 
@@ -687,13 +699,17 @@ func (v *oneofValue) getChild(name string, builder valueBuilder) (valueType, val
 	return nil, nil, errors.New("[oneofValue] Not supported")
 }
 
-func (v *oneofValue) toRegex() string {
+func (v *oneofValue) toRegex(ctx regexBuildContext) string {
+	nextCtx, result := ctx.With(v)
+	if nextCtx == nil {
+		return result
+	}
 	var sb strings.Builder
 	for _, option := range v.options {
 		if sb.Len() > 0 {
 			sb.WriteString("|")
 		}
-		sb.WriteString("(?:" + option.ValueType.toRegex() + ")")
+		sb.WriteString("(?:" + option.ValueType.toRegex(*nextCtx) + ")")
 	}
 	return sb.String()
 }
@@ -737,8 +753,12 @@ func (v *complexValue) parseChild(builder valueBuilder, value string) (*nodeInfo
 	return v.structValue.parseChild(v.resolveBuilderFieldPath(builder, v.structValueKey), value)
 }
 
-func (v *complexValue) toRegex() string {
-	return v.textValue.toRegex()
+func (v *complexValue) toRegex(ctx regexBuildContext) string {
+	nextCtx, result := ctx.With(v)
+	if nextCtx == nil {
+		return result
+	}
+	return v.textValue.toRegex(*nextCtx)
 }
 
 func (v *complexValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
@@ -761,9 +781,10 @@ func (v *delegatedValue) parseChild(builder valueBuilder, value string) (*nodeIn
 	return v.target.parseChild(builder, value)
 }
 
-func (v *delegatedValue) toRegex() string {
+func (v *delegatedValue) toRegex(ctx regexBuildContext) string {
 	//TODO
-	return ".*?" //v.target.toRegex()
+	// return ".*?" //
+	return v.target.toRegex(ctx)
 }
 
 func (v *delegatedValue) getChild(name string, builder valueBuilder) (valueType, valueBuilder, error) {
@@ -772,4 +793,20 @@ func (v *delegatedValue) getChild(name string, builder valueBuilder) (valueType,
 
 func (v *delegatedValue) supportsChildren() bool {
 	return v.target.supportsChildren()
+}
+
+func newRegexBuildContext() regexBuildContext {
+	return regexBuildContext{usage: map[valueType]int{}}
+}
+
+func (c regexBuildContext) With(currentType valueType) (*regexBuildContext, string) {
+	if c.usage[currentType] > 0 {
+		return nil, ".*?"
+	}
+	newMap := map[valueType]int{}
+	for k, v := range c.usage {
+		newMap[k] = v
+	}
+	newMap[currentType] = newMap[currentType] + 1
+	return &regexBuildContext{usage: newMap}, ""
 }
