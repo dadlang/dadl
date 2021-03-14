@@ -15,12 +15,12 @@ var (
 	regexIdentifierOrQuoted = "(?:[a-zA-Z0-9-_]+)|(['].*['])"
 	regexIdentifier         = "[a-zA-Z0-9-_]+"
 
-	keyWithDelegatedValueRe = regexp.MustCompile("(?P<key>" + regexIdentifierOrQuoted + ")(\\s+(?P<rest>.*))?")
+	keyWithDelegatedValueRe = regexp.MustCompile("^(?P<key>" + regexIdentifierOrQuoted + ")(\\s+(?P<rest>.*))?$")
 )
 
 type DadlSchema interface {
 	getRoot() valueType
-	getNode(path string, builder valueBuilder) (valueType, valueBuilder, error)
+	getNode(path string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error)
 }
 
 type dadlSchemaImpl struct {
@@ -31,12 +31,12 @@ func (s *dadlSchemaImpl) getRoot() valueType {
 	return s.root
 }
 
-func (s *dadlSchemaImpl) getNode(nodePath string, builder valueBuilder) (valueType, valueBuilder, error) {
+func (s *dadlSchemaImpl) getNode(nodePath string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error) {
 	node := s.root
 	var err error
 	pathElements := strings.Split(nodePath, ".")
 	for _, pathElement := range pathElements {
-		node, builder, err = node.getChild(pathElement, builder)
+		node, builder, err = node.getChild(pathElement, builder, meta)
 		if err != nil {
 			return nil, nil, err
 		}

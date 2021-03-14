@@ -51,7 +51,7 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 	case *identifierTypeDef:
 		return &stringValue{regex: "[A-Za-z-0-9_-]+"}, nil
 	case *intTypeDef:
-		return &intValue{}, nil
+		return &intValue{min: typeDef.(*intTypeDef).Min, max: typeDef.(*intTypeDef).Max}, nil
 	case *numberTypeDef:
 		return &numberValue{}, nil
 	case *boolTypeDef:

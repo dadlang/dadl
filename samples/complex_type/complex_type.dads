@@ -1,13 +1,13 @@
 @schema dadl 0.1
 
 [types]
-address formula <host identifier> ':' <port int>
+address formula <host identifier> ':' <port int 0..65535>
 addressExtra complex[address]
     extra1 string
-    extra2 int
+    extra2 int 0..100
 addressExtraSpread complex[...address]...
     extra1 string
-    extra2 int
+    extra2 int 0..100
 
 [structure]
 sampleComplex complex[address]list[addressExtra]

@@ -4,4 +4,4 @@
 someRoot
 	firstChild string
 	secondChild struct
-		nestedChild int
+		nestedChild int 0..100

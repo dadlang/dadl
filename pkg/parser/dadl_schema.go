@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"log"
+	"math/big"
 	"reflect"
 	"regexp"
 	"strings"
@@ -102,7 +103,15 @@ func GetDadlSchema() DadlSchema {
 						valueType: whitespace,
 					},
 					{
-						valueType: &stringValue{regex: "-?[0-9]+\\.\\.-?[0-9]+"},
+						name:      "min",
+						valueType: &intValue{},
+					},
+					{
+						valueType: &constantValue{value: ".."},
+					},
+					{
+						name:      "max",
+						valueType: &intValue{},
 					},
 				},
 			},
@@ -532,6 +541,12 @@ func mapType(data map[string]interface{}) (abstractTypeDef, error) {
 		result = &stringTypeDef{}
 	case "intDef":
 		result = &intTypeDef{}
+		if data["min"] != nil {
+			result.(*intTypeDef).Min = data["min"].(*big.Int)
+		}
+		if data["max"] != nil {
+			result.(*intTypeDef).Max = data["max"].(*big.Int)
+		}
 	case "boolDef":
 		result = &boolTypeDef{}
 	case "numberDef":
@@ -657,7 +672,10 @@ type stringTypeDef struct {
 	Regex string
 }
 type identifierTypeDef struct{}
-type intTypeDef struct{}
+type intTypeDef struct {
+	Min *big.Int
+	Max *big.Int
+}
 type numberTypeDef struct{}
 type boolTypeDef struct{}
 type structTypeDef struct {

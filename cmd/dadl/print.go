@@ -49,7 +49,7 @@ func printHandler(filePath string, treePath string) {
 	tree, err := p.Parse(file, parser.NewFSResourceProvider(filepath.Dir(filePath)))
 
 	if err != nil {
-		println("Err: ", err.Error())
+		println(err.Error())
 		return
 	}
 
@@ -112,10 +112,7 @@ func addChild(tree treeprint.Tree, key string, value interface{}) treeprint.Tree
 		} else {
 			return tree.AddBranch(key + ": " + asString)
 		}
-	} else if asInt, ok := value.(int); ok {
-		return tree.AddBranch(fmt.Sprintf("%s: %v", key, asInt))
-	} else if asBool, ok := value.(bool); ok {
-		return tree.AddBranch(fmt.Sprintf("%s: %v", key, asBool))
+	} else {
+		return tree.AddBranch(fmt.Sprintf("%s: %v", key, value))
 	}
-	return tree
 }

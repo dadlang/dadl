@@ -15,5 +15,4 @@ sampleTypes
             nestedField bool
     map map[string]int 
     formula formula <var1 type1>
-sampleFormula formula <var1 type1> '!' <var2 type2> ['#' <comment string> ['@' <magic string>]]
 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -19,8 +21,8 @@ func execute() {
 }
 
 func main() {
-	//log.SetFlags(0)
-	//log.SetOutput(ioutil.Discard)
+	log.SetFlags(0)
+	log.SetOutput(ioutil.Discard)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

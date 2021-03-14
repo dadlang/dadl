@@ -3,6 +3,7 @@ package parser
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,6 +15,41 @@ import (
 //NewParser - creates new Parser instance
 func NewParser() Parser {
 	return Parser{}
+}
+
+//ParseError describes a parsing error
+type ParseError interface {
+	error
+	GetLine()
+	GetColumn()
+	GetReason()
+}
+
+//DefaultParseError default ParseError
+type defaultParseError struct {
+	line   int
+	column int
+	reason string
+}
+
+func newParseError(line int, col int, reason string) error {
+	return defaultParseError{line, col, reason}
+}
+
+func (e defaultParseError) Error() string {
+	return fmt.Sprintf("Parse error [line: %v, col: %v]: %v", e.line, e.column, e.reason)
+}
+
+func (e defaultParseError) GetLine() string {
+	return e.GetLine()
+}
+
+func (e defaultParseError) GetColumn() string {
+	return e.GetColumn()
+}
+
+func (e defaultParseError) GetReason() string {
+	return e.reason
 }
 
 type nodeInfo struct {
@@ -30,6 +66,7 @@ type parseContext struct {
 	indentWeight   int
 	parentNodeInfo *nodeInfo
 	lastNodeInfo   *nodeInfo
+	lineNo         int
 }
 
 var groupRe = regexp.MustCompile("^\\[(?P<treePath>[a-zA-Z0-9-_.]*)\\s*(?:<<\\s*(?P<importPath>.+))?\\]$")
@@ -59,7 +96,9 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 	}
 
 	var err error
+	lineNo := 1
 
+	//TODO
 	ctxByIndent = make([]*parseContext, 100)
 	ctxByIndent[0] = ctx
 
@@ -71,6 +110,7 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 		}
 
 		line := strings.TrimRight(scanner.Text(), "\t \n")
+		ctx.lineNo = lineNo
 
 		indentWeight := calcIndentWeight(line)
 
@@ -86,7 +126,7 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 			if strings.HasPrefix(line, "#") {
 				//	fmt.Println("skip comment:", line)
 			} else if strings.HasPrefix(line, "@") {
-				err := p.parseMagic(ctx, builder, line, resources)
+				err := p.parseMagic(ctx, builder, line, parseMetadata{lineNo: ctx.lineNo, colNo: 0}, resources)
 				if err != nil {
 					return err
 				}
@@ -107,13 +147,15 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 						}
 					}
 				}
+				ctx.lineNo = lineNo
 
-				ctx.lastNodeInfo, err = ctx.parentNodeInfo.valueType.parseChild(ctx.parentNodeInfo.builder, line)
+				ctx.lastNodeInfo, err = ctx.parentNodeInfo.valueType.parseChild(ctx.parentNodeInfo.builder, line, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
 				if err != nil {
 					return err
 				}
 			}
 		}
+		lineNo++
 	}
 	return nil
 }
@@ -133,12 +175,12 @@ func (p *Parser) processGroup(line string, ctx *parseContext, rootBuilder valueB
 		if ctx.schema == nil {
 			return nil, errors.New("Missing schema info")
 		}
-		schemaNode, valueBuilder, err := ctx.schema.getNode(treePath, rootBuilder)
+		schemaNode, valueBuilder, err := ctx.schema.getNode(treePath, rootBuilder, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
 		if err != nil {
 			return nil, err
 		}
 
-		schemaNode.parse(valueBuilder, "")
+		schemaNode.parse(valueBuilder, "", parseMetadata{lineNo: ctx.lineNo, colNo: 0})
 
 		if importPath != "" {
 			file, err := resources.GetResource(importPath)
@@ -174,7 +216,7 @@ func calcIndentWeight(line string) int {
 	return len(line)
 }
 
-func (p *Parser) parseMagic(ctx *parseContext, rootBuilder valueBuilder, line string, resources ResourceProvider) error {
+func (p *Parser) parseMagic(ctx *parseContext, rootBuilder valueBuilder, line string, meta parseMetadata, resources ResourceProvider) error {
 	if strings.HasPrefix(line, "@schema ") {
 		var err error
 		parts := strings.Split(line[8:], " ")
@@ -190,7 +232,7 @@ func (p *Parser) parseMagic(ctx *parseContext, rootBuilder valueBuilder, line st
 		}
 
 		if len(parts) == 2 && strings.HasPrefix(parts[1], "[") && strings.HasSuffix(parts[1], "]") {
-			valueType, _, err := ctx.schema.getNode(parts[1][1:len(parts[1])-1], rootBuilder)
+			valueType, _, err := ctx.schema.getNode(parts[1][1:len(parts[1])-1], rootBuilder, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
 			if err != nil {
 				return err
 			}
@@ -200,9 +242,8 @@ func (p *Parser) parseMagic(ctx *parseContext, rootBuilder valueBuilder, line st
 			ctx.parentNodeInfo = &nodeInfo{valueType: ctx.schema.getRoot(), builder: rootBuilder}
 		}
 		return nil
-	} else {
-		return errors.New("Unknown magic line: " + line)
 	}
+	return newParseError(meta.lineNo, meta.colNo, "Unknown magic line: "+line)
 }
 
 //Parser - parses DADL files

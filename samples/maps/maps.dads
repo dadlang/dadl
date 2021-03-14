@@ -1,15 +1,15 @@
 @schema dadl 0.1
 
 [types]
-coordinates formula <x int> ' ' <y int>
+coordinates formula <x int 0..255> ' ' <y int 0..255>
 
 [structure]
 structMap map[string]
     textValue string
-    intValue int
+    intValue int 0..100
 
 stringMap map[string]string
 
-intMap map[string]int
+intMap map[string]int 0..100
 
 coordinatesMap map[string]coordinates

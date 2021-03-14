@@ -5,7 +5,7 @@ typeDef complex[...formula <type identifier> [' #' <desc string>]]map[string]typ
 httpMethod enum GET POST PUT PATCH DELETE
 path complex[string `/.*`]list[pathOrOperation]
 operation formula <verb httpMethod> <interactor string>
-pathOrOperation oneof path operation
+pathOrOperation oneof[path|operation]
 
 [structure]
 name string
