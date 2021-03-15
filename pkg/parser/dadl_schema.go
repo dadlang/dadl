@@ -332,13 +332,17 @@ func GetDadlSchema() DadlSchema {
 				valueType: &stringValue{regex: "oneof"},
 			},
 			{
-				valueType: whitespace,
+				valueType: &constantValue{value: "["},
 			},
 			{
 				name: "options",
 				valueType: &sequenceValue{
-					itemType: &stringValue{regex: regexIdentifier},
+					itemType:  &stringValue{regex: regexIdentifier},
+					separator: "|",
 				},
+			},
+			{
+				valueType: &constantValue{value: "]"},
 			},
 		},
 	}

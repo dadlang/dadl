@@ -1,18 +1,18 @@
 @schema schema.dads
 
 sampleTypes
-    string string [A-Z]+
-    int int
-    bool bool 
-    number number
-    enum enum value1 value2 value3
-    sequence sequence someType
-    list list someType
+    sampleString string [A-Z]+
+    sampleInt int
+    sampleBool bool 
+    sampleNumber number
+    sampleEnum enum value1 value2 value3
+    sampleSequence sequence someType
+    sampleList list someType
     sampleStruct struct
         firstField string
         secondField int
         children
             nestedField bool
-    map map[string]int 
-    formula formula <var1 type1>
+    sampleMap map[string]int 
+    sampleFormula formula <var1 type1>
 

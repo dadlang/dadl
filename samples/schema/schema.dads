@@ -11,7 +11,7 @@ enumType formula 'enum ' <values sequence[identifier]>
 formulaElementVariable formula '<' <name identifier> ' ' <type identifier> '>'
 
 formulaElementConstant string `'.*?'`
-formulaElement oneof formulaElementVariable formulaElementConstant formulaElementOptional
+formulaElement oneof[formulaElementVariable|formulaElementConstant|formulaElementOptional]
 formulaElements sequence[formulaElement]
 formulaElementOptional formula '[' <elements formulaElements> ']'
 formulaType formula 'formula ' <elements formulaElements>
@@ -22,7 +22,7 @@ listType formula 'list ' <itemType identifier>
 mapType formula 'map[' <keyType typeReference> ']' [<valueType typeReference>]
 typeReference formula <typeName identifier>
 structType complex[formula ['struct']]map[identifier]typeDef 
-typeDef oneof stringType identifierType intType numberType boolType enumType formulaType sequenceType binaryType listType mapType structType
+typeDef oneof[stringType|identifierType|intType|numberType|boolType|enumType|formulaType|sequenceType|binaryType|listType|mapType|structType]
 
 [structure]
 sampleTypes map[identifier]typeDef

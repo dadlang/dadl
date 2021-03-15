@@ -3,9 +3,8 @@
 [types]
 typeDef complex[...formula <type identifier> [' #' <desc string>]]map[string]typeDef
 httpMethod enum GET POST PUT PATCH DELETE
-path complex[string `/.*`]list[pathOrOperation]
+path complex[string `/.*`]list[oneof[path|operation]]
 operation formula <verb httpMethod> <interactor string>
-pathOrOperation oneof[path|operation]
 
 [structure]
 name string
@@ -25,4 +24,4 @@ modules map[string]
         input map[string]typeDef
         output map[string]typeDef
     transport
-        rest list[pathOrOperation]
+        rest list[oneof[path|operation]]

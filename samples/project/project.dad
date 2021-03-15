@@ -10,7 +10,7 @@ codename boutique
 name overridden
 
 [modules.Another]
-name Anooooother
+name Overridden
 types
     Other String
 

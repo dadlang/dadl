@@ -413,7 +413,7 @@ type sequenceValue struct {
 func (v *sequenceValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
 	log.Println("sequenceValue [parse]:", value)
 	if v.re == nil {
-		sep := v.separator
+		sep := regexp.QuoteMeta(v.separator)
 		if sep == "" {
 			sep = "\\s"
 		}
@@ -458,7 +458,7 @@ func (v *sequenceValue) toRegex(ctx regexBuildContext) string {
 	if nextCtx == nil {
 		return result
 	}
-	sep := v.separator
+	sep := regexp.QuoteMeta(v.separator)
 	if sep == "" {
 		sep = "\\s"
 	}
