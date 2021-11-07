@@ -1,0 +1,4 @@
+@schema fragment.dads [modules._]
+
+prop1 some text
+prop2 5

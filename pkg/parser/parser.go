@@ -232,7 +232,8 @@ func (p *Parser) parseMagic(ctx *parseContext, rootBuilder valueBuilder, line st
 		}
 
 		if len(parts) == 2 && strings.HasPrefix(parts[1], "[") && strings.HasSuffix(parts[1], "]") {
-			valueType, _, err := ctx.schema.getNode(parts[1][1:len(parts[1])-1], rootBuilder, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
+			tmpRootBuilder := &dynamicMapOrListValueBuilder{value: Node{}}
+			valueType, _, err := ctx.schema.getNode(parts[1][1:len(parts[1])-1], tmpRootBuilder, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
 			if err != nil {
 				return err
 			}

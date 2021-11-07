@@ -1,0 +1,8 @@
+@schema dadl 0.1
+
+[types]
+
+[structure]
+modules map[identifier]
+    prop1 string
+    prop2 int 0..1024

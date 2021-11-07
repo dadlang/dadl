@@ -14,8 +14,9 @@ type regexBuildContext struct {
 }
 
 type parseMetadata struct {
-	lineNo int
-	colNo  int
+	fileName string
+	lineNo   int
+	colNo    int
 }
 
 type valueType interface {
@@ -24,6 +25,7 @@ type valueType interface {
 	parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error)
 	getChild(name string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error)
 	supportsChildren() bool
+	isSimpleValue() bool
 }
 
 type binaryAsTextFormat int
@@ -130,6 +132,10 @@ func (v *stringValue) supportsChildren() bool {
 	return false
 }
 
+func (v *stringValue) isSimpleValue() bool {
+	return true
+}
+
 type boolValue struct {
 }
 
@@ -147,7 +153,7 @@ func (v *boolValue) parseChild(builder valueBuilder, value string, meta parseMet
 }
 
 func (v *boolValue) getChild(name string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("not supported")
 }
 
 func (v *boolValue) toRegex(ctx regexBuildContext) string {
@@ -156,6 +162,10 @@ func (v *boolValue) toRegex(ctx regexBuildContext) string {
 
 func (v *boolValue) supportsChildren() bool {
 	return false
+}
+
+func (v *boolValue) isSimpleValue() bool {
+	return true
 }
 
 type constantValue struct {
@@ -168,11 +178,11 @@ func (v *constantValue) parse(builder valueBuilder, value string, meta parseMeta
 }
 
 func (v *constantValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
-	return nil, errors.New("Not supported")
+	return nil, errors.New("not supported")
 }
 
 func (v *constantValue) getChild(name string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("not supported")
 }
 
 func (v *constantValue) toRegex(ctx regexBuildContext) string {
@@ -181,6 +191,10 @@ func (v *constantValue) toRegex(ctx regexBuildContext) string {
 
 func (v *constantValue) supportsChildren() bool {
 	return false
+}
+
+func (v *constantValue) isSimpleValue() bool {
+	return true
 }
 
 type intValue struct {
@@ -224,6 +238,10 @@ func (v *intValue) supportsChildren() bool {
 	return false
 }
 
+func (v *intValue) isSimpleValue() bool {
+	return true
+}
+
 type numberValue struct {
 	min big.Float
 	max big.Float
@@ -235,11 +253,11 @@ func (v *numberValue) parse(builder valueBuilder, value string, meta parseMetada
 }
 
 func (v *numberValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
-	return nil, errors.New("Not supported")
+	return nil, errors.New("not supported")
 }
 
 func (v *numberValue) getChild(name string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("not supported")
 }
 
 func (v *numberValue) toRegex(ctx regexBuildContext) string {
@@ -250,34 +268,51 @@ func (v *numberValue) supportsChildren() bool {
 	return false
 }
 
+func (v *numberValue) isSimpleValue() bool {
+	return true
+}
+
 type enumValue struct {
 	valueType valueType
 	values    map[string]string
 }
 
 func (v *enumValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+	log.Println("enumValue [parse]:", value)
 	mappedValue, ok := v.values[value]
 	if ok {
 		return v.valueType.parse(builder, mappedValue, meta)
 	} else {
-		return newParseError(meta.lineNo, meta.colNo, "Unsupported enum value: "+value)
+		return newParseError(meta.lineNo, meta.colNo, "unsupported enum value: "+value)
 	}
 }
 
 func (v *enumValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
-	return nil, errors.New("Not supported")
+	return nil, errors.New("not supported")
 }
 
 func (v *enumValue) getChild(name string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("not supported")
 }
 
 func (v *enumValue) toRegex(ctx regexBuildContext) string {
-	return "\\S+"
+	k := make([]string, len(v.values))
+	var i uint64
+	for key := range v.values {
+		k[i] = key
+		i++
+	}
+	log.Println("enumValue [toRegex]:", strings.Join(k, "|"))
+
+	return "(?:" + strings.Join(k, "|") + ")"
 }
 
 func (v *enumValue) supportsChildren() bool {
 	return false
+}
+
+func (v *enumValue) isSimpleValue() bool {
+	return true
 }
 
 type formulaItem struct {
@@ -336,6 +371,7 @@ func (v *formulaValue) parse(builder valueBuilder, value string, meta parseMetad
 				continue
 			}
 			matchValue := valueToParse[match[itemIdxFrom]:match[itemIdxFrom+1]]
+			log.Println("formulaValue [matchValue]:", matchValue)
 			var newBuilder valueBuilder
 			if item.spread {
 				newBuilder = builder
@@ -404,6 +440,10 @@ func (v *formulaValue) supportsChildren() bool {
 	return false
 }
 
+func (v *formulaValue) isSimpleValue() bool {
+	return false
+}
+
 type sequenceValue struct {
 	itemType  valueType
 	separator string
@@ -469,6 +509,10 @@ func (v *sequenceValue) supportsChildren() bool {
 	return false
 }
 
+func (v *sequenceValue) isSimpleValue() bool {
+	return false
+}
+
 type binaryValue struct {
 	textFormat binaryAsTextFormat
 }
@@ -480,11 +524,11 @@ func (v *binaryValue) parse(builder valueBuilder, value string, meta parseMetada
 }
 
 func (v *binaryValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
-	return nil, errors.New("Not supported")
+	return nil, errors.New("not supported")
 }
 
 func (v *binaryValue) getChild(name string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error) {
-	return nil, nil, errors.New("Not supported")
+	return nil, nil, errors.New("not supported")
 }
 
 func (v *binaryValue) toRegex(ctx regexBuildContext) string {
@@ -493,6 +537,10 @@ func (v *binaryValue) toRegex(ctx regexBuildContext) string {
 
 func (v *binaryValue) supportsChildren() bool {
 	return false
+}
+
+func (v *binaryValue) isSimpleValue() bool {
+	return true
 }
 
 type listValue struct {
@@ -528,6 +576,10 @@ func (v *listValue) getChild(name string, builder valueBuilder, meta parseMetada
 }
 
 func (v *listValue) supportsChildren() bool {
+	return false
+}
+
+func (v *listValue) isSimpleValue() bool {
 	return false
 }
 
@@ -585,6 +637,10 @@ func (v *mapValue) supportsChildren() bool {
 	return true
 }
 
+func (v *mapValue) isSimpleValue() bool {
+	return false
+}
+
 type structValue struct {
 	children map[string]valueType
 }
@@ -637,11 +693,15 @@ func (v *structValue) getChild(name string, builder valueBuilder, meta parseMeta
 	if c, ok := v.children[name]; ok {
 		return c, builder.getFieldBuilder(name), nil
 	}
-	return nil, nil, errors.New("Not found: " + name)
+	return nil, nil, errors.New("child not found: " + name)
 }
 
 func (v *structValue) supportsChildren() bool {
 	return true
+}
+
+func (v *structValue) isSimpleValue() bool {
+	return false
 }
 
 type oneofValueOption struct {
@@ -681,6 +741,8 @@ func (v *oneofValue) parse(builder valueBuilder, value string, meta parseMetadat
 			valueBuilder := builder
 			if matchedOption.ValueKey != "" {
 				valueBuilder = builder.getFieldBuilder(matchedOption.ValueKey)
+			} else if matchedOption.ValueType.isSimpleValue() {
+				valueBuilder = builder.getFieldBuilder("value")
 			}
 			err := matchedOption.ValueType.parse(valueBuilder, trimmedValue, meta)
 			if err != nil {
@@ -737,6 +799,10 @@ func (v *oneofValue) supportsChildren() bool {
 	return false
 }
 
+func (v *oneofValue) isSimpleValue() bool {
+	return false
+}
+
 type complexValue struct {
 	textValue      valueType
 	textValueKey   string
@@ -783,6 +849,10 @@ func (v *complexValue) supportsChildren() bool {
 	return v.structValue.supportsChildren()
 }
 
+func (v *complexValue) isSimpleValue() bool {
+	return false
+}
+
 type delegatedValue struct {
 	target valueType
 }
@@ -807,6 +877,10 @@ func (v *delegatedValue) getChild(name string, builder valueBuilder, meta parseM
 
 func (v *delegatedValue) supportsChildren() bool {
 	return v.target.supportsChildren()
+}
+
+func (v *delegatedValue) isSimpleValue() bool {
+	return v.target.isSimpleValue()
 }
 
 func newRegexBuildContext() regexBuildContext {

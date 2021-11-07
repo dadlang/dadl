@@ -233,4 +233,54 @@ echo "Hello Dadl!"`,
 			},
 		},
 	},
+	{
+		name:     "forula test",
+		testFile: "formula/formula.dad",
+		expected: Node{
+			"nodes": []interface{}{
+				Node{
+					"@type": "restPath",
+					"value": "/v1",
+					"children": []interface{}{
+						Node{
+							"@type": "restPath",
+							"value": "/cart",
+
+							"children": []interface{}{
+								Node{
+									"@type":      "restOperation",
+									"interactor": "getCart",
+									"verb":       "GET",
+								},
+								Node{
+									"@type":      "restOperation",
+									"interactor": "emptyCart",
+									"verb":       "DELETE",
+								},
+								Node{
+									"@type": "restPath",
+									"value": "/add",
+									"children": []interface{}{
+										Node{
+											"@type":      "restOperation",
+											"interactor": "addItem",
+											"verb":       "POST",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	},
+	{
+		name:     "fragment test",
+		testFile: "fragment/fragment.dad",
+		expected: Node{
+			"prop1": "some text",
+			"prop2": 5,
+		},
+	},
 }

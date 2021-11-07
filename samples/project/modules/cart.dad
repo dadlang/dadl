@@ -1,4 +1,4 @@
-@schema ./project.dads [modules._]
+@schema ../project.dads [modules._]
 
 name Cart
 namespace cart

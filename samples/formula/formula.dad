@@ -1,0 +1,9 @@
+@schema formula.dads
+
+[nodes]
+/v1
+    /cart
+        GET getCart
+        DELETE emptyCart
+        /add
+            POST addItem

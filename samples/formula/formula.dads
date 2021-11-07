@@ -1,0 +1,9 @@
+@schema dadl 0.1
+
+[types]
+httpMethod enum GET POST PUT PATCH DELETE
+restPath complex[string `/.*`]list[oneof[restPath|restOperation]]
+restOperation formula <verb httpMethod> <interactor string>
+
+[structure]
+nodes list[oneof[restPath|restOperation]]
