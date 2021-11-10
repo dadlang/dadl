@@ -89,7 +89,7 @@ And create data file `import_file.dad`
 
     @schema import_text_file.dads
 
-    [someBrainfuck << ./brainfuck.bf]     
+    [someBrainfuck < ./brainfuck.bf]     
 
 ## Custom types
 Create `custom_types.dads'

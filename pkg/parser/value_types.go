@@ -21,8 +21,8 @@ type parseMetadata struct {
 
 type valueType interface {
 	toRegex(ctx regexBuildContext) string
-	parse(builder valueBuilder, value string, meta parseMetadata) error
-	parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error)
+	parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error)
+	parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error)
 	getChild(name string, builder valueBuilder, meta parseMetadata) (valueType, valueBuilder, error)
 	supportsChildren() bool
 	isSimpleValue() bool
@@ -36,7 +36,6 @@ const (
 )
 
 type delegatedValueBuilder struct {
-	metaBuilder
 	set func(value interface{})
 	get func() interface{}
 }
@@ -96,14 +95,14 @@ type stringValue struct {
 	indentLock int
 }
 
-func (v *stringValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *stringValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("stringValue [parse]:", value)
 	builder.setSimpleValue(strings.TrimSpace(value))
 	v.indentLock = -1
-	return nil
+	return nil, nil
 }
 
-func (v *stringValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *stringValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	log.Println("stringValue [parseChild]:", value)
 	if v.indentLock < 0 {
 		v.indentLock = calcIndentWeight(value)
@@ -139,16 +138,16 @@ func (v *stringValue) isSimpleValue() bool {
 type boolValue struct {
 }
 
-func (v *boolValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *boolValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	boolVal, err := strconv.ParseBool(strings.TrimSpace(value))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	builder.setSimpleValue(boolVal)
-	return nil
+	return nil, nil
 }
 
-func (v *boolValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *boolValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	return nil, errors.New("[boolValue] Not supported")
 }
 
@@ -172,12 +171,12 @@ type constantValue struct {
 	value string
 }
 
-func (v *constantValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *constantValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	builder.setSimpleValue(value == v.value)
-	return nil
+	return nil, nil
 }
 
-func (v *constantValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *constantValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	return nil, errors.New("not supported")
 }
 
@@ -202,26 +201,26 @@ type intValue struct {
 	max *big.Int
 }
 
-func (v *intValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *intValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("intValue [parse]:", value)
 	if v.min != nil && v.max != nil && big.NewInt(-2147483648).Cmp(v.min) <= 0 && big.NewInt(2147483647).Cmp(v.max) >= 0 {
 		intValue, err := strconv.Atoi(value)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		builder.setSimpleValue(intValue)
 	} else {
 		intValue := big.NewInt(0)
 		_, ok := intValue.SetString(value, 0)
 		if !ok {
-			return newParseError(meta.lineNo, meta.colNo, "Invalid int value: "+value)
+			return nil, newParseError(meta.lineNo, meta.colNo, "Invalid int value: "+value)
 		}
 		builder.setSimpleValue(intValue)
 	}
-	return nil
+	return nil, nil
 }
 
-func (v *intValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *intValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	log.Println("intValue [parseChild]:", value)
 	return nil, errors.New("not supported")
 }
@@ -247,12 +246,12 @@ type numberValue struct {
 	max big.Float
 }
 
-func (v *numberValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *numberValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	builder.setSimpleValue(strings.TrimSpace(value))
-	return nil
+	return nil, nil
 }
 
-func (v *numberValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *numberValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	return nil, errors.New("not supported")
 }
 
@@ -277,17 +276,17 @@ type enumValue struct {
 	values    map[string]string
 }
 
-func (v *enumValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *enumValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("enumValue [parse]:", value)
 	mappedValue, ok := v.values[value]
 	if ok {
 		return v.valueType.parse(builder, mappedValue, meta)
 	} else {
-		return newParseError(meta.lineNo, meta.colNo, "unsupported enum value: "+value)
+		return nil, newParseError(meta.lineNo, meta.colNo, "unsupported enum value: "+value)
 	}
 }
 
-func (v *enumValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *enumValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	return nil, errors.New("not supported")
 }
 
@@ -329,17 +328,18 @@ type formulaValue struct {
 	formula     []formulaItem
 	_re         *regexp.Regexp
 	_mapping    []formulaItem
-	_structType valueType
+	_structItem *formulaItem
 }
 
-func buildMapping(mapping *[]formulaItem, items []formulaItem, structType *valueType) {
+func buildMapping(mapping *[]formulaItem, items []formulaItem, structItem **formulaItem) {
 	for _, item := range items {
 		if item.composite {
-			buildMapping(mapping, item.children, structType)
+			buildMapping(mapping, item.children, structItem)
 		} else if item.name != "" || item.spread {
 			*mapping = append(*mapping, item)
 			if item.asStructType {
-				*structType = item.valueType
+				itemCopy := item
+				*structItem = &itemCopy
 			}
 		}
 	}
@@ -354,16 +354,17 @@ func (v *formulaValue) initIfRequired() error {
 		log.Println("formulaValue [regex]:", sb.String())
 		v._re = regexp.MustCompile(sb.String())
 		v._mapping = []formulaItem{}
-		buildMapping(&v._mapping, v.formula, &v._structType)
+		buildMapping(&v._mapping, v.formula, &v._structItem)
 	}
 	return nil
 }
 
-func (v *formulaValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *formulaValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("formulaValue [parse]:", value)
 	v.initIfRequired()
 	valueToParse := strings.TrimSpace(value)
 	match := v._re.FindStringSubmatchIndex(valueToParse)
+	var valueMeta *valueMeta
 	if match != nil {
 		for i, item := range v._mapping {
 			itemIdxFrom := i*2 + 2
@@ -378,21 +379,33 @@ func (v *formulaValue) parse(builder valueBuilder, value string, meta parseMetad
 			} else {
 				newBuilder = builder.getFieldBuilder(item.name)
 			}
-			err := item.valueType.parse(newBuilder, matchValue, meta)
+			var err error
+			lastValueMeta, err := item.valueType.parse(newBuilder, matchValue, meta)
+			if v._structItem != nil && v._structItem.valueType == item.valueType {
+				valueMeta = lastValueMeta
+			}
+
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	} else {
-		return newParseError(meta.lineNo, meta.colNo, "No match for: "+value)
+		return nil, newParseError(meta.lineNo, meta.colNo, "No match for: "+value)
 	}
-	return nil
+	return valueMeta, nil
 }
 
-func (v *formulaValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *formulaValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	v.initIfRequired()
-	if v._structType != nil {
-		return v._structType.parseChild(builder, value, meta)
+	log.Println("formulaValue [parseChild] struct type:", v._structItem)
+	if v._structItem != nil {
+		var newBuilder valueBuilder
+		if v._structItem.spread {
+			newBuilder = builder
+		} else {
+			newBuilder = builder.getFieldBuilder(v._structItem.name)
+		}
+		return v._structItem.valueType.parseChild(newBuilder, value, valueMeta, meta)
 	}
 	return nil, errors.New("[formulaValue] Not supported: parseChild")
 }
@@ -450,7 +463,7 @@ type sequenceValue struct {
 	re        *regexp.Regexp
 }
 
-func (v *sequenceValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *sequenceValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("sequenceValue [parse]:", value)
 	if v.re == nil {
 		sep := regexp.QuoteMeta(v.separator)
@@ -465,27 +478,27 @@ func (v *sequenceValue) parse(builder valueBuilder, value string, meta parseMeta
 
 	match := v.re.FindStringSubmatch(strings.TrimSpace(value))
 	if match == nil {
-		return newParseError(meta.lineNo, meta.colNo, "sequenceValue [parse]: No match")
+		return nil, newParseError(meta.lineNo, meta.colNo, "sequenceValue [parse]: No match")
 	}
 	matches := []string{}
 	matches = append(matches, match[1])
 	for match[2] != "" {
 		match = v.re.FindStringSubmatch(match[2])
 		if match == nil {
-			return newParseError(meta.lineNo, meta.colNo, "sequenceValue [parse]: No match")
+			return nil, newParseError(meta.lineNo, meta.colNo, "sequenceValue [parse]: No match")
 		}
 		matches = append(matches, match[1])
 	}
 	for _, match := range matches {
-		err := v.itemType.parse(builder.getListItemBuilder(), match, meta)
+		_, err := v.itemType.parse(builder.getListItemBuilder(), match, meta)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
-func (v *sequenceValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *sequenceValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	return nil, errors.New("[sequenceValue] Not supported")
 }
 
@@ -517,13 +530,13 @@ type binaryValue struct {
 	textFormat binaryAsTextFormat
 }
 
-func (v *binaryValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *binaryValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("binaryValue [parse]:", value)
 	builder.setSimpleValue(strings.TrimSpace(value))
-	return nil
+	return nil, nil
 }
 
-func (v *binaryValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *binaryValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	return nil, errors.New("not supported")
 }
 
@@ -547,16 +560,16 @@ type listValue struct {
 	childType valueType
 }
 
-func (v *listValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *listValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("listValue [parse]:", value)
-	return nil
+	return nil, nil
 }
 
-func (v *listValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *listValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	log.Println("listValue [parseChild]:", value)
 
 	childBuilder := builder.getListItemBuilder()
-	err := v.childType.parse(childBuilder, value, meta)
+	vMata, err := v.childType.parse(childBuilder, value, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -564,6 +577,7 @@ func (v *listValue) parseChild(builder valueBuilder, value string, meta parseMet
 	return &nodeInfo{
 		valueType: v.childType,
 		builder:   childBuilder,
+		valueMeta: vMata,
 	}, nil
 }
 
@@ -588,29 +602,31 @@ type mapValue struct {
 	valueType valueType
 }
 
-func (v *mapValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *mapValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("mapValue [parse]:", value)
 	// if builder.getValue() == nil {
 	// 	builder.setValue(map[string]interface{}{})
 	// }
-	return nil
+	return nil, nil
 }
 
-func (v *mapValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *mapValue) parseChild(builder valueBuilder, value string, parentValueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	log.Println("mapValue [parseChild]:", value)
 
 	//TODO
 	parts := strings.SplitN(strings.TrimSpace(value), " ", 2)
 
 	childBuilder := builder.getFieldBuilder(parts[0])
+	var vMeta *valueMeta
+	var err error
 	if len(parts) > 1 {
-		err := v.valueType.parse(childBuilder, parts[1], meta)
+		vMeta, err = v.valueType.parse(childBuilder, parts[1], meta)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		//TODO
-		err := v.valueType.parse(childBuilder, "", meta)
+		vMeta, err = v.valueType.parse(childBuilder, "", meta)
 		if err != nil {
 			return nil, err
 		}
@@ -618,6 +634,7 @@ func (v *mapValue) parseChild(builder valueBuilder, value string, meta parseMeta
 	return &nodeInfo{
 		valueType: v.valueType,
 		builder:   childBuilder,
+		valueMeta: vMeta,
 	}, nil
 }
 
@@ -645,15 +662,15 @@ type structValue struct {
 	children map[string]valueType
 }
 
-func (v *structValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *structValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("structValue [parse]:", value)
 	if strings.TrimSpace(value) != "" {
-		return newParseError(meta.lineNo, meta.colNo, "Unexpected value: "+value)
+		return nil, newParseError(meta.lineNo, meta.colNo, "Unexpected value: "+value)
 	}
-	return nil
+	return nil, nil
 }
 
-func (v *structValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *structValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	log.Println("structValue [parseChild]:", value)
 
 	res := map[string]string{}
@@ -673,7 +690,7 @@ func (v *structValue) parseChild(builder valueBuilder, value string, meta parseM
 
 	if childType, ok := v.children[key]; ok {
 		childValueBuilder := builder.getFieldBuilder(key)
-		err := childType.parse(childValueBuilder, res["rest"], meta)
+		_, err := childType.parse(childValueBuilder, res["rest"], meta)
 		if err != nil {
 			return nil, err
 		}
@@ -716,7 +733,7 @@ type oneofValue struct {
 	_res    []*regexp.Regexp
 }
 
-func (v *oneofValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *oneofValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("oneofValue [parse]:", value)
 	if len(v._res) == 0 {
 		v._res = make([]*regexp.Regexp, len(v.options))
@@ -726,7 +743,7 @@ func (v *oneofValue) parse(builder valueBuilder, value string, meta parseMetadat
 	}
 
 	trimmedValue := strings.TrimSpace(value)
-	builder.setMeta("lastMatch", nil)
+
 	for i, re := range v._res {
 		match := re.FindStringSubmatch(trimmedValue)
 		if match != nil {
@@ -744,21 +761,27 @@ func (v *oneofValue) parse(builder valueBuilder, value string, meta parseMetadat
 			} else if matchedOption.ValueType.isSimpleValue() {
 				valueBuilder = builder.getFieldBuilder("value")
 			}
-			err := matchedOption.ValueType.parse(valueBuilder, trimmedValue, meta)
+			vMeta, err := matchedOption.ValueType.parse(valueBuilder, trimmedValue, meta)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			builder.setMeta("lastMatch", i)
-			return nil
+			if vMeta == nil {
+				vMeta = &valueMeta{}
+			}
+			vMeta.setMeta("lastMatch", i)
+			log.Println("oneofValue [parse] last match:", i)
+			log.Println("oneofValue [parse] builder:", builder)
+			return vMeta, nil
 		}
 	}
-	return newParseError(meta.lineNo, meta.colNo, "No match for: "+value)
+	return nil, newParseError(meta.lineNo, meta.colNo, "No match for: "+value)
 }
 
-func (v *oneofValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
-	log.Println("oneofValue [parseChild]:", value)
+func (v *oneofValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
+	log.Println("oneofValue [parseChild]:", value, valueMeta)
 
-	lastMatch := builder.getMeta("lastMatch")
+	log.Println("oneofValue [parseChild] builder:", builder)
+	lastMatch := valueMeta.getMeta("lastMatch")
 	if lastMatch != nil {
 		lastOption := v.options[lastMatch.(int)]
 		log.Println("oneofValue [lastOption]:", lastOption.Name)
@@ -766,7 +789,7 @@ func (v *oneofValue) parseChild(builder valueBuilder, value string, meta parseMe
 		if lastOption.ValueKey != "" {
 			valueBuilder = builder.getFieldBuilder(lastOption.ValueKey)
 		}
-		return lastOption.ValueType.parseChild(valueBuilder, value, meta)
+		return lastOption.ValueType.parseChild(valueBuilder, value, valueMeta, meta)
 	}
 	return nil, newParseError(meta.lineNo, meta.colNo, "[oneofValue] Children not supported")
 }
@@ -810,7 +833,7 @@ type complexValue struct {
 	structValueKey string
 }
 
-func (v *complexValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *complexValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	log.Println("complexValue [parse]:", value)
 	if v.textValueKey == "" {
 		return v.textValue.parse(builder, value, meta)
@@ -825,12 +848,12 @@ func (v *complexValue) resolveBuilderFieldPath(builder valueBuilder, path string
 	return builder
 }
 
-func (v *complexValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
+func (v *complexValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
 	log.Println("complexValue [parseChild]:", value)
 	if v.structValueKey == "" {
-		return v.structValue.parseChild(builder, value, meta)
+		return v.structValue.parseChild(builder, value, valueMeta, meta)
 	}
-	return v.structValue.parseChild(v.resolveBuilderFieldPath(builder, v.structValueKey), value, meta)
+	return v.structValue.parseChild(v.resolveBuilderFieldPath(builder, v.structValueKey), value, valueMeta, meta)
 }
 
 func (v *complexValue) toRegex(ctx regexBuildContext) string {
@@ -857,12 +880,12 @@ type delegatedValue struct {
 	target valueType
 }
 
-func (v *delegatedValue) parse(builder valueBuilder, value string, meta parseMetadata) error {
+func (v *delegatedValue) parse(builder valueBuilder, value string, meta parseMetadata) (*valueMeta, error) {
 	return v.target.parse(builder, value, meta)
 }
 
-func (v *delegatedValue) parseChild(builder valueBuilder, value string, meta parseMetadata) (*nodeInfo, error) {
-	return v.target.parseChild(builder, value, meta)
+func (v *delegatedValue) parseChild(builder valueBuilder, value string, valueMeta *valueMeta, meta parseMetadata) (*nodeInfo, error) {
+	return v.target.parseChild(builder, value, valueMeta, meta)
 }
 
 func (v *delegatedValue) toRegex(ctx regexBuildContext) string {

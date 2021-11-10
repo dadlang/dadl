@@ -47,7 +47,8 @@ func GetDadlSchema() DadlSchema {
 		textValue: &formulaValue{
 			formula: []formulaItem{
 				{
-					valueType: &stringValue{regex: "(?:struct)|"},
+					optional:  true,
+					valueType: &constantValue{value: "struct"},
 				},
 			},
 		},
@@ -201,6 +202,11 @@ func GetDadlSchema() DadlSchema {
 
 						{
 							valueType: &constantValue{value: "<"},
+						},
+						{
+							name:      "structType",
+							optional:  true,
+							valueType: &constantValue{value: "+"},
 						},
 						{
 							name:      "name",
@@ -513,8 +519,9 @@ func mapFormulaItem(data map[string]interface{}) (abstractFormulaItem, error) {
 			return nil, err
 		}
 		result = &formulaItemVariable{
-			Name: data["name"].(string),
-			Type: mappedType,
+			Name:        data["name"].(string),
+			Type:        mappedType,
+			StructValue: data["structType"] == true,
 		}
 	case "formulaItemConstant":
 		result = &formulaItemConstant{Value: strings.Trim(data["value"].(string), "'")}
@@ -693,8 +700,9 @@ type abstractFormulaItem interface {
 }
 
 type formulaItemVariable struct {
-	Name string
-	Type abstractTypeDef
+	Name        string
+	Type        abstractTypeDef
+	StructValue bool
 }
 
 type formulaItemConstant struct {

@@ -20,9 +20,9 @@ func NewParser() Parser {
 //ParseError describes a parsing error
 type ParseError interface {
 	error
-	GetLine()
-	GetColumn()
-	GetReason()
+	GetLine() int
+	GetColumn() int
+	GetReason() string
 }
 
 //DefaultParseError default ParseError
@@ -40,12 +40,12 @@ func (e defaultParseError) Error() string {
 	return fmt.Sprintf("Parse error [line: %v, col: %v]: %v", e.line, e.column, e.reason)
 }
 
-func (e defaultParseError) GetLine() string {
-	return e.GetLine()
+func (e defaultParseError) GetLine() int {
+	return e.line
 }
 
-func (e defaultParseError) GetColumn() string {
-	return e.GetColumn()
+func (e defaultParseError) GetColumn() int {
+	return e.column
 }
 
 func (e defaultParseError) GetReason() string {
@@ -55,10 +55,7 @@ func (e defaultParseError) GetReason() string {
 type nodeInfo struct {
 	valueType valueType
 	builder   valueBuilder
-}
-
-type parseResult struct {
-	root Node
+	valueMeta *valueMeta
 }
 
 type parseContext struct {
@@ -69,7 +66,7 @@ type parseContext struct {
 	lineNo         int
 }
 
-var groupRe = regexp.MustCompile("^\\[(?P<treePath>[a-zA-Z0-9-_.]*)\\s*(?:<<\\s*(?P<importPath>.+))?\\]$")
+var groupRe = regexp.MustCompile(`^\[(?P<treePath>[a-zA-Z0-9-_.]*)\s*(?:<\s*(?P<importPath>.+))?\]$`)
 
 func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, error) {
 
@@ -85,7 +82,6 @@ func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, erro
 
 func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceProvider, builder valueBuilder, schema DadlSchema) error {
 
-	ctxByIndent := make([]*parseContext, 100)
 	ctx := &parseContext{schema: schema}
 
 	if schema != nil {
@@ -99,7 +95,7 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 	lineNo := 1
 
 	//TODO
-	ctxByIndent = make([]*parseContext, 100)
+	ctxByIndent := make([]*parseContext, 100)
 	ctxByIndent[0] = ctx
 
 	scanner := bufio.NewScanner(reader)
@@ -124,7 +120,7 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 			ctxByIndent[0] = ctx
 		} else if strings.TrimSpace(line) != "" {
 			if strings.HasPrefix(line, "#") {
-				//	fmt.Println("skip comment:", line)
+				log.Println("skip comment:", line)
 			} else if strings.HasPrefix(line, "@") {
 				err := p.parseMagic(ctx, builder, line, parseMetadata{lineNo: ctx.lineNo, colNo: 0}, resources)
 				if err != nil {
@@ -149,7 +145,7 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 				}
 				ctx.lineNo = lineNo
 
-				ctx.lastNodeInfo, err = ctx.parentNodeInfo.valueType.parseChild(ctx.parentNodeInfo.builder, line, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
+				ctx.lastNodeInfo, err = ctx.parentNodeInfo.valueType.parseChild(ctx.parentNodeInfo.builder, line, ctx.parentNodeInfo.valueMeta, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
 				if err != nil {
 					return err
 				}
@@ -173,14 +169,17 @@ func (p *Parser) processGroup(line string, ctx *parseContext, rootBuilder valueB
 		treePath := result["treePath"]
 		importPath := result["importPath"]
 		if ctx.schema == nil {
-			return nil, errors.New("Missing schema info")
+			return nil, errors.New("missing schema info")
 		}
 		schemaNode, valueBuilder, err := ctx.schema.getNode(treePath, rootBuilder, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
 		if err != nil {
 			return nil, err
 		}
 
-		schemaNode.parse(valueBuilder, "", parseMetadata{lineNo: ctx.lineNo, colNo: 0})
+		valueMeta, err := schemaNode.parse(valueBuilder, "", parseMetadata{lineNo: ctx.lineNo, colNo: 0})
+		if err != nil {
+			return nil, err
+		}
 
 		if importPath != "" {
 			file, err := resources.GetResource(importPath)
@@ -202,9 +201,9 @@ func (p *Parser) processGroup(line string, ctx *parseContext, rootBuilder valueB
 				}
 			}
 		}
-		return &parseContext{schema: ctx.schema, parentNodeInfo: &nodeInfo{valueType: schemaNode, builder: valueBuilder}, indentWeight: 0}, nil
+		return &parseContext{schema: ctx.schema, parentNodeInfo: &nodeInfo{valueType: schemaNode, builder: valueBuilder, valueMeta: valueMeta}, indentWeight: 0}, nil
 	}
-	return nil, errors.New("Invalid group definition")
+	return nil, errors.New("invalid group definition")
 }
 
 func calcIndentWeight(line string) int {

@@ -1,14 +1,16 @@
 package parser
 
-type metaBuilder struct {
+import "log"
+
+type valueMeta struct {
 	meta map[string]interface{}
 }
 
-func (b *metaBuilder) getMeta(name string) interface{} {
+func (b *valueMeta) getMeta(name string) interface{} {
 	return b.meta[name]
 }
 
-func (b *metaBuilder) setMeta(name string, value interface{}) {
+func (b *valueMeta) setMeta(name string, value interface{}) {
 	if b.meta == nil {
 		b.meta = map[string]interface{}{}
 	}
@@ -20,12 +22,9 @@ type valueBuilder interface {
 	setSimpleValue(value interface{})
 	getFieldBuilder(name string) valueBuilder
 	getListItemBuilder() valueBuilder
-	setMeta(name string, value interface{})
-	getMeta(name string) interface{}
 }
 
 type dynamicMapOrListValueBuilder struct {
-	metaBuilder
 	value interface{}
 }
 
@@ -38,6 +37,7 @@ func (b *dynamicMapOrListValueBuilder) setSimpleValue(value interface{}) {
 }
 
 func (b *dynamicMapOrListValueBuilder) getFieldBuilder(name string) valueBuilder {
+	log.Println("dynamicMapOrListValueBuilder [getFieldBuilder]: ", name)
 	if b.value == nil {
 		b.value = map[string]interface{}{}
 	}
@@ -48,6 +48,7 @@ func (b *dynamicMapOrListValueBuilder) getFieldBuilder(name string) valueBuilder
 }
 
 func (b *dynamicMapOrListValueBuilder) getListItemBuilder() valueBuilder {
+	log.Println("dynamicMapOrListValueBuilder [getListItemBuilder]")
 	if b.value == nil {
 		b.value = []interface{}{}
 	}
@@ -60,7 +61,6 @@ func (b *dynamicMapOrListValueBuilder) getListItemBuilder() valueBuilder {
 }
 
 type itemInMapValueBuilder struct {
-	metaBuilder
 	parent    map[string]interface{}
 	fieldName string
 }
@@ -74,6 +74,7 @@ func (b *itemInMapValueBuilder) setSimpleValue(value interface{}) {
 }
 
 func (b *itemInMapValueBuilder) getFieldBuilder(name string) valueBuilder {
+	log.Println("itemInMapValueBuilder [getFieldBuilder]:", name)
 	if b.parent[b.fieldName] == nil {
 		b.parent[b.fieldName] = map[string]interface{}{}
 	}
@@ -84,6 +85,7 @@ func (b *itemInMapValueBuilder) getFieldBuilder(name string) valueBuilder {
 }
 
 func (b *itemInMapValueBuilder) getListItemBuilder() valueBuilder {
+	log.Println("itemInMapValueBuilder [getListItemBuilder]")
 	if b.parent[b.fieldName] == nil {
 		b.parent[b.fieldName] = []interface{}{}
 	}
@@ -96,7 +98,6 @@ func (b *itemInMapValueBuilder) getListItemBuilder() valueBuilder {
 }
 
 type itemInListValueBuilder struct {
-	metaBuilder
 	parent []interface{}
 	idx    int
 }
@@ -110,6 +111,7 @@ func (b *itemInListValueBuilder) setSimpleValue(value interface{}) {
 }
 
 func (b *itemInListValueBuilder) getFieldBuilder(name string) valueBuilder {
+	log.Println("itemInListValueBuilder [getFieldBuilder]:", name)
 	if b.parent[b.idx] == nil {
 		b.parent[b.idx] = map[string]interface{}{}
 	}
@@ -120,6 +122,7 @@ func (b *itemInListValueBuilder) getFieldBuilder(name string) valueBuilder {
 }
 
 func (b *itemInListValueBuilder) getListItemBuilder() valueBuilder {
+	log.Println("itemInListValueBuilder [getListItemBuilder]")
 	if b.parent[b.idx] == nil {
 		b.parent[b.idx] = []interface{}{}
 	}

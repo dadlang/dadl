@@ -15,17 +15,17 @@ func newResolver(typesDefs map[string]abstractTypeDef) *typeResolver {
 }
 
 func (r *typeResolver) buildFormulaItem(item abstractFormulaItem) (formulaItem, error) {
-	switch item.(type) {
+	switch item := item.(type) {
 	case *formulaItemVariable:
-		itemType, err := r.buildType(item.(*formulaItemVariable).Type)
+		itemType, err := r.buildType(item.Type)
 		if err != nil {
 			return formulaItem{}, err
 		}
-		return formulaItem{name: item.(*formulaItemVariable).Name, valueType: itemType}, nil
+		return formulaItem{name: item.Name, valueType: itemType, asStructType: item.StructValue}, nil
 	case *formulaItemConstant:
-		return formulaItem{valueType: &constantValue{value: item.(*formulaItemConstant).Value}}, nil
+		return formulaItem{valueType: &constantValue{value: item.Value}}, nil
 	case *formulaItemOptional:
-		childrenDef := item.(*formulaItemOptional).Items
+		childrenDef := item.Items
 		children := make([]formulaItem, len(childrenDef))
 		for i, itemDef := range childrenDef {
 			childItem, err := r.buildFormulaItem(itemDef)
@@ -36,14 +36,14 @@ func (r *typeResolver) buildFormulaItem(item abstractFormulaItem) (formulaItem, 
 		}
 		return formulaItem{optional: true, composite: true, children: children}, nil
 	default:
-		return formulaItem{}, errors.New("Unknown item type")
+		return formulaItem{}, errors.New("unknown item type")
 	}
 }
 
 func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
-	switch typeDef.(type) {
+	switch typeDef := typeDef.(type) {
 	case *stringTypeDef:
-		regex := typeDef.(*stringTypeDef).Regex
+		regex := typeDef.Regex
 		if regex != "" {
 			return &stringValue{regex: regex}, nil
 		}
@@ -51,7 +51,7 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 	case *identifierTypeDef:
 		return &stringValue{regex: "[A-Za-z-0-9_-]+"}, nil
 	case *intTypeDef:
-		return &intValue{min: typeDef.(*intTypeDef).Min, max: typeDef.(*intTypeDef).Max}, nil
+		return &intValue{min: typeDef.Min, max: typeDef.Max}, nil
 	case *numberTypeDef:
 		return &numberValue{}, nil
 	case *boolTypeDef:
@@ -59,8 +59,8 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 	case *enumTypeDef:
 		var valueType valueType
 		var err error
-		if typeDef.(*enumTypeDef).ValueType != nil {
-			valueType, err = r.buildType(typeDef.(*enumTypeDef).ValueType)
+		if typeDef.ValueType != nil {
+			valueType, err = r.buildType(typeDef.ValueType)
 			if err != nil {
 				return nil, err
 			}
@@ -68,7 +68,7 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 			valueType = &stringValue{}
 		}
 		enumValue := &enumValue{values: map[string]string{}, valueType: valueType}
-		for _, value := range typeDef.(*enumTypeDef).Values {
+		for _, value := range typeDef.Values {
 			if value.MappedValue != "" {
 				enumValue.values[value.TextValue] = value.MappedValue
 			} else {
@@ -78,7 +78,7 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 		return enumValue, nil
 	case *formulaTypeDef:
 		items := []formulaItem{}
-		for _, itemDef := range typeDef.(*formulaTypeDef).Items {
+		for _, itemDef := range typeDef.Items {
 			item, err := r.buildFormulaItem(itemDef)
 			if err != nil {
 				return nil, err
@@ -87,7 +87,7 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 		}
 		return &formulaValue{formula: items}, nil
 	case *sequenceTypeDef:
-		itemType, err := r.buildType(typeDef.(*sequenceTypeDef).ItemType)
+		itemType, err := r.buildType(typeDef.ItemType)
 		if err != nil {
 			return nil, err
 		}
@@ -95,17 +95,17 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 	// case "binaryDef":
 	// 	return &binaryValue{}, nil
 	case *listTypeDef:
-		valueType, err := r.buildType(typeDef.(*listTypeDef).ItemType)
+		valueType, err := r.buildType(typeDef.ItemType)
 		if err != nil {
 			return nil, err
 		}
 		return &listValue{childType: valueType}, nil
 	case *mapTypeDef:
-		keyType, err := r.buildType(typeDef.(*mapTypeDef).KeyType)
+		keyType, err := r.buildType(typeDef.KeyType)
 		if err != nil {
 			return nil, err
 		}
-		valueType, err := r.buildType(typeDef.(*mapTypeDef).ValueType)
+		valueType, err := r.buildType(typeDef.ValueType)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +113,7 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 	case *structTypeDef:
 		var err error
 		children := map[string]valueType{}
-		childerenDef := typeDef.(*structTypeDef).Children
+		childerenDef := typeDef.Children
 		for key, def := range childerenDef {
 			children[key], err = r.buildType(def)
 			if err != nil {
@@ -122,7 +122,7 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 		}
 		return &structValue{children: children}, nil
 	case *oneofTypeDef:
-		optionsDef := typeDef.(*oneofTypeDef).Options
+		optionsDef := typeDef.Options
 		options := make([]oneofValueOption, len(optionsDef))
 		for i, typeName := range optionsDef {
 			valueType, err := r.resolveType(typeName)
@@ -133,25 +133,25 @@ func (r *typeResolver) buildType(typeDef abstractTypeDef) (valueType, error) {
 		}
 		return &oneofValue{options: options}, nil
 	case *complexTypeDef:
-		textType, err := r.buildType(typeDef.(*complexTypeDef).ValueType)
+		textType, err := r.buildType(typeDef.ValueType)
 		if err != nil {
 			return nil, err
 		}
-		structureType, err := r.buildType(typeDef.(*complexTypeDef).ChildType)
+		structureType, err := r.buildType(typeDef.ChildType)
 		if err != nil {
 			return nil, err
 		}
 		textValueKey := "value"
-		if typeDef.(*complexTypeDef).SpreadValue {
+		if typeDef.SpreadValue {
 			textValueKey = ""
 		}
 		structValueKey := "children"
-		if typeDef.(*complexTypeDef).SpreadChildren {
+		if typeDef.SpreadChildren {
 			structValueKey = ""
 		}
 		return &complexValue{textValue: textType, structValue: structureType, textValueKey: textValueKey, structValueKey: structValueKey}, nil
 	case *customTypeRef:
-		return r.resolveType(typeDef.(*customTypeRef).TypeName)
+		return r.resolveType(typeDef.TypeName)
 	}
 	return nil, errors.New("Unsupported type: " + reflect.TypeOf(typeDef).Name())
 }

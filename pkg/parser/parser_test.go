@@ -234,7 +234,7 @@ echo "Hello Dadl!"`,
 		},
 	},
 	{
-		name:     "forula test",
+		name:     "formula test",
 		testFile: "formula/formula.dad",
 		expected: Node{
 			"nodes": []interface{}{

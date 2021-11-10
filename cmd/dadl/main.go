@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -17,12 +15,9 @@ complex stuctures using custom DSL and preserve readability at the same time.
 Complete documentation is available at http://github.com/dadlang/dadl`,
 }
 
-func execute() {
-}
-
 func main() {
-	log.SetFlags(0)
-	log.SetOutput(ioutil.Discard)
+	//log.SetFlags(0)
+	//log.SetOutput(ioutil.Discard)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

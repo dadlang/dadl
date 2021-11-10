@@ -8,5 +8,5 @@ secondModule
     name Second module
     active false
 
-[modules.thirdModule << ./module.dad]
+[modules.thirdModule < ./module.dad]
 active false
