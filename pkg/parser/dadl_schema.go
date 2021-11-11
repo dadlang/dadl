@@ -196,6 +196,11 @@ func GetDadlSchema() DadlSchema {
 				ValueKey:  "value",
 			},
 			{
+				Name:      "formulaItemRegex",
+				ValueType: &stringValue{regex: "`.*`"},
+				ValueKey:  "regex",
+			},
+			{
 				Name: "formulaItemVariable",
 				ValueType: &formulaValue{
 					formula: []formulaItem{
@@ -525,6 +530,8 @@ func mapFormulaItem(data map[string]interface{}) (abstractFormulaItem, error) {
 		}
 	case "formulaItemConstant":
 		result = &formulaItemConstant{Value: strings.Trim(data["value"].(string), "'")}
+	case "formulaItemRegex":
+		result = &formulaItemRegex{Regex: strings.Trim(data["regex"].(string), "`")}
 	case "formulaItemOptional":
 		var err error
 		itemsDef := data["items"].([]interface{})
@@ -707,6 +714,10 @@ type formulaItemVariable struct {
 
 type formulaItemConstant struct {
 	Value string
+}
+
+type formulaItemRegex struct {
+	Regex string
 }
 
 type formulaItemOptional struct {

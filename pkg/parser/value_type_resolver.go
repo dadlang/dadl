@@ -24,6 +24,8 @@ func (r *typeResolver) buildFormulaItem(item abstractFormulaItem) (formulaItem, 
 		return formulaItem{name: item.Name, valueType: itemType, asStructType: item.StructValue}, nil
 	case *formulaItemConstant:
 		return formulaItem{valueType: &constantValue{value: item.Value}}, nil
+	case *formulaItemRegex:
+		return formulaItem{valueType: &stringValue{regex: item.Regex}}, nil
 	case *formulaItemOptional:
 		childrenDef := item.Items
 		children := make([]formulaItem, len(childrenDef))
