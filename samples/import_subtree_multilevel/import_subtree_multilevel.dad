@@ -1,0 +1,9 @@
+@schema import_subtree_multilevel.dads
+
+[modules]     
+firstModule
+    name First module
+secondModule
+    name Second module
+
+[modules.thirdModule < ./modules/test/module.dad]

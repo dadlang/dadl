@@ -1,0 +1,4 @@
+@schema ../import_subtree_matches.dads [modules._]
+
+name First module
+active true

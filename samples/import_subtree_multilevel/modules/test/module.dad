@@ -1,0 +1,5 @@
+@schema import_subtree.dads [modules._]
+
+name Third module
+
+[interactors.someInteractor < ./interactors/someInteractor.dad]

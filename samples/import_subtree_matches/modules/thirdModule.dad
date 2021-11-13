@@ -1,0 +1,4 @@
+@schema ../import_subtree_matches.dads [modules._]
+
+name Third module
+active true

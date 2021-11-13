@@ -184,6 +184,52 @@ echo "Hello Dadl!"`,
 		},
 	},
 	{
+		name:     "import subtree matches test",
+		testFile: "import_subtree_matches/import_subtree_matches.dad",
+		expected: Node{
+			"modules": Node{
+				"firstModule": Node{
+					"active": true,
+					"name":   "First module",
+				},
+				"secondModule": Node{
+					"active": true,
+					"name":   "Second module",
+				},
+				"thirdModule": Node{
+					"active": true,
+					"name":   "Third module",
+				},
+				"fourthModule": Node{
+					"active": false,
+					"name":   "Fourth module",
+				},
+			},
+		},
+	},
+	{
+		name:     "import subtree multilevel test",
+		testFile: "import_subtree_multilevel/import_subtree_multilevel.dad",
+		expected: Node{
+			"modules": Node{
+				"firstModule": Node{
+					"name": "First module",
+				},
+				"secondModule": Node{
+					"name": "Second module",
+				},
+				"thirdModule": Node{
+					"name": "Third module",
+					"interactors": Node{
+						"someInteractor": Node{
+							"name": "Some interactor",
+						},
+					},
+				},
+			},
+		},
+	},
+	{
 		name:     "complex type test",
 		testFile: "complex_type/complex_type.dad",
 		expected: Node{

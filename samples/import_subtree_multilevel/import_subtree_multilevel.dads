@@ -1,0 +1,9 @@
+@schema dadl 0.1
+
+[structure]
+modules map[string]
+    name string
+    interactors map[string]
+        name string
+
+

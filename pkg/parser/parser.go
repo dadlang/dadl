@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -66,7 +67,7 @@ type parseContext struct {
 	lineNo         int
 }
 
-var groupRe = regexp.MustCompile(`^\[(?P<treePath>[a-zA-Z0-9-_.]*)\s*(?:<\s*(?P<importPath>.+))?\]$`)
+var groupRe = regexp.MustCompile(`^\[(?P<treePath>[a-zA-Z0-9-_.$]*)\s*(?:<\s*(?P<importPath>.+))?\]$`)
 
 func (p *Parser) Parse(reader io.Reader, resources ResourceProvider) (Node, error) {
 
@@ -111,7 +112,7 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 		indentWeight := calcIndentWeight(line)
 
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-			//	println("Process group:", line)
+			log.Println("process group:", line)
 			ctx, err = p.processGroup(line, ctx, builder, resources)
 			if err != nil {
 				return err
@@ -157,7 +158,6 @@ func (p *Parser) ParseWithBuilderAndSchema(reader io.Reader, resources ResourceP
 }
 
 func (p *Parser) processGroup(line string, ctx *parseContext, rootBuilder valueBuilder, resources ResourceProvider) (*parseContext, error) {
-	//fmt.Println(line)
 	match := groupRe.FindStringSubmatch(line)
 	if match != nil {
 		result := make(map[string]string)
@@ -171,34 +171,64 @@ func (p *Parser) processGroup(line string, ctx *parseContext, rootBuilder valueB
 		if ctx.schema == nil {
 			return nil, errors.New("missing schema info")
 		}
-		schemaNode, valueBuilder, err := ctx.schema.getNode(treePath, rootBuilder, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
-		if err != nil {
-			return nil, err
-		}
 
-		valueMeta, err := schemaNode.parse(valueBuilder, "", parseMetadata{lineNo: ctx.lineNo, colNo: 0})
-		if err != nil {
-			return nil, err
-		}
+		var valueMeta *valueMeta
+		var schemaNode valueType
+		var valueBuilder valueBuilder
+		var err error
 
 		if importPath != "" {
-			file, err := resources.GetResource(importPath)
+			paths, err := resources.FindResources(importPath)
 			if err != nil {
-				log.Fatal(err)
+				return nil, err
 			}
-			defer file.Close()
+			log.Println("Resources: ", resources)
 
-			if _, ok := schemaNode.(*stringValue); ok {
-				data, err := ioutil.ReadAll(file)
+			if len(paths) == 0 {
+				return nil, fmt.Errorf("no file matches given path: %s", importPath)
+			}
+
+			for _, path := range paths {
+				file, err := resources.GetResource(path)
 				if err != nil {
 					return nil, err
 				}
-				valueBuilder.setSimpleValue(string(data))
-			} else {
-				err := p.ParseWithBuilderAndSchema(file, resources, valueBuilder, &dadlSchemaImpl{root: schemaNode})
+				defer file.Close()
+
+				_, fileName := filepath.Split(path)
+
+				targetPath := treePath
+				if strings.HasSuffix(treePath, "._") {
+					targetPath = strings.TrimRight(treePath, "_") + strings.TrimSuffix(filepath.Base(fileName), filepath.Ext(fileName))
+				}
+
+				schemaNode, valueBuilder, err = ctx.schema.getNode(targetPath, rootBuilder, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
 				if err != nil {
 					return nil, err
 				}
+
+				if _, ok := schemaNode.(*stringValue); ok {
+					data, err := ioutil.ReadAll(file)
+					if err != nil {
+						return nil, err
+					}
+					valueBuilder.setSimpleValue(string(data))
+				} else {
+					err := p.ParseWithBuilderAndSchema(file, resources.ForResource(path), valueBuilder, &dadlSchemaImpl{root: schemaNode})
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
+		} else {
+			schemaNode, valueBuilder, err = ctx.schema.getNode(treePath, rootBuilder, parseMetadata{lineNo: ctx.lineNo, colNo: 0})
+			if err != nil {
+				return nil, err
+			}
+
+			valueMeta, err = schemaNode.parse(valueBuilder, "", parseMetadata{lineNo: ctx.lineNo, colNo: 0})
+			if err != nil {
+				return nil, err
 			}
 		}
 		return &parseContext{schema: ctx.schema, parentNodeInfo: &nodeInfo{valueType: schemaNode, builder: valueBuilder, valueMeta: valueMeta}, indentWeight: 0}, nil

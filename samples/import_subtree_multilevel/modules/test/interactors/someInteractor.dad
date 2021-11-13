@@ -1,0 +1,3 @@
+@schema import_subtree.dads [modules._.interactors._]
+
+name Some interactor

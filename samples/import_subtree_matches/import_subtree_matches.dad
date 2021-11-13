@@ -1,0 +1,8 @@
+@schema import_subtree_matches.dads
+
+[modules]     
+fourthModule
+    name Fourth module
+    active false
+
+[modules._ < ./modules/*.dad]

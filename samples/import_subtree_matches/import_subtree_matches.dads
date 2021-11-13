@@ -1,0 +1,7 @@
+@schema dadl 0.1
+
+[structure]
+modules map[string]
+    name string
+    active bool
+
